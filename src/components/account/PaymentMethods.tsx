@@ -5,25 +5,29 @@ import { useRouter } from 'next/navigation';
 import { translate as t } from '@/i18n/translate';
 import { api, errorMessage } from '@/lib/client/api';
 import { useToast } from '@/components/providers/ToastProvider';
-import type { SavedCard } from '@/lib/domain/types';
+import type { PaymentMethod, PaymentMethodKind } from '@/lib/domain/types';
+import { describe, iconFor } from '@/lib/domain/paymentMethods';
 import { Icon } from '@/components/ui/Icon';
 import { ConfirmDialog, Overlay } from '@/components/ui/Overlay';
 import { Badge, Button, EmptyState, Field, Input } from '@/components/ui/primitives';
 import { cx } from '@/components/ui/cx';
 
 /**
- * Saved cards.
+ * Saved ways to pay — cards and wallets in one list.
  *
- * The full card number is sent once, validated server-side and discarded —
- * only the brand and last four digits are ever stored or returned.
+ * One list rather than a section per kind, because the only question checkout
+ * asks is which one is the default, and that is a single choice across all of
+ * them. A card's number is sent once, validated server-side and discarded; a
+ * wallet has no number, only the account it links to.
  */
-export function PaymentMethods({ cards: initial }: { cards: SavedCard[] }) {
+export function PaymentMethods({ cards: initial }: { cards: PaymentMethod[] }) {
   const router = useRouter();
   const { toast } = useToast();
 
   const [cards, setCards] = useState(initial);
   const [addOpen, setAddOpen] = useState(false);
-  const [removeTarget, setRemoveTarget] = useState<SavedCard | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<PaymentMethod | null>(null);
+  const [addKind, setAddKind] = useState<PaymentMethodKind>('card');
   const [busy, setBusy] = useState(false);
 
   const remove = async () => {
@@ -58,7 +62,17 @@ export function PaymentMethods({ cards: initial }: { cards: SavedCard[] }) {
         <EmptyState
           icon="card"
           title={t('account', 'paymentMethodsEmpty')}
-          action={<Button onClick={() => setAddOpen(true)} icon="plus">{t('account', 'addCard')}</Button>}
+          action={
+            <Button
+              onClick={() => {
+                setAddKind('card');
+                setAddOpen(true);
+              }}
+              icon="plus"
+            >
+              {t('account', 'addCard')}
+            </Button>
+          }
         />
       ) : (
         <>
@@ -69,20 +83,25 @@ export function PaymentMethods({ cards: initial }: { cards: SavedCard[] }) {
                 className="flex items-center gap-3 rounded-card border border-line bg-white p-3"
               >
                 <span className="flex h-10 w-14 shrink-0 items-center justify-center rounded bg-surface-sunken">
-                  <Icon name="card" size={20} className="text-ink-soft" />
+                  <Icon name={iconFor(card)} size={20} className="text-ink-soft" />
                 </span>
 
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-                    {t('account', 'cardEndingIn', { brand: card.brand, last4: card.last4 })}
+                    <span className="truncate">
+                      {describe(card).title} {describe(card).detail}
+                    </span>
                     {card.isDefault ? <Badge tone="brand">{t('account', 'defaultCard')}</Badge> : null}
                   </p>
-                  <p className="text-xs text-ink-muted">
-                    {t('account', 'expires', {
-                      month: String(card.expMonth).padStart(2, '0'),
-                      year: String(card.expYear).slice(-2),
-                    })}
-                  </p>
+                  {/* A card says when it runs out; a wallet has nothing to say. */}
+                  {card.kind === 'card' && card.expMonth && card.expYear ? (
+                    <p className="text-xs text-ink-muted">
+                      {t('account', 'expires', {
+                        month: String(card.expMonth).padStart(2, '0'),
+                        year: String(card.expYear).slice(-2),
+                      })}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex shrink-0 gap-1">
@@ -108,14 +127,19 @@ export function PaymentMethods({ cards: initial }: { cards: SavedCard[] }) {
             ))}
           </ul>
 
-          <Button className="mt-4" variant="outline" icon="plus" onClick={() => setAddOpen(true)}>
-            {t('account', 'addCard')}
-          </Button>
+          <AddButtons
+            onPick={(kind) => {
+              setAddKind(kind);
+              setAddOpen(true);
+            }}
+            existing={cards}
+          />
         </>
       )}
 
-      <AddCardDialog
+      <AddMethodDialog
         open={addOpen}
+        kind={addKind}
         onClose={() => setAddOpen(false)}
         onAdded={(card) => {
           setCards((current) => [...current.map((c) => ({ ...c, isDefault: card.isDefault ? false : c.isDefault })), card]);
@@ -133,7 +157,9 @@ export function PaymentMethods({ cards: initial }: { cards: SavedCard[] }) {
         confirmLabel={t('general', 'remove')}
         body={
           removeTarget ? (
-            <p>{t('account', 'cardEndingIn', { brand: removeTarget.brand, last4: removeTarget.last4 })}</p>
+            <p>
+              {describe(removeTarget).title} {describe(removeTarget).detail}
+            </p>
           ) : null
         }
       />
@@ -141,42 +167,95 @@ export function PaymentMethods({ cards: initial }: { cards: SavedCard[] }) {
   );
 }
 
-function AddCardDialog({
+/**
+ * The row of ways to add a method.
+ *
+ * A wallet is offered only while it is not already linked: one PayPal account
+ * per person is the whole of it, and a second button would open a dialog whose
+ * only outcome is re-linking the same wallet.
+ */
+function AddButtons({
+  onPick,
+  existing,
+}: {
+  onPick: (kind: PaymentMethodKind) => void;
+  existing: PaymentMethod[];
+}) {
+  const has = (kind: PaymentMethodKind) => existing.some((m) => m.kind === kind);
+
+  return (
+    <div className="mt-4 flex flex-wrap gap-2">
+      <Button variant="outline" icon="plus" onClick={() => onPick('card')}>
+        {t('account', 'addCard')}
+      </Button>
+      {!has('paypal') ? (
+        <Button variant="outline" icon="wallet" onClick={() => onPick('paypal')}>
+          {t('account', 'addPaypal')}
+        </Button>
+      ) : null}
+      {!has('apple_pay') ? (
+        <Button variant="outline" icon="phone" onClick={() => onPick('apple_pay')}>
+          {t('account', 'addApplePay')}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function AddMethodDialog({
   open,
+  kind,
   onClose,
   onAdded,
 }: {
   open: boolean;
   onClose: () => void;
-  onAdded: (card: SavedCard) => void;
+  onAdded: (method: PaymentMethod) => void;
+  kind: PaymentMethodKind;
 }) {
   const { toast } = useToast();
 
   const [number, setNumber] = useState('');
   const [expiry, setExpiry] = useState('');
+  const [accountLabel, setAccountLabel] = useState('');
   const [makeDefault, setMakeDefault] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isCard = kind === 'card';
   const digits = number.replace(/\D/g, '');
   const [month, year] = expiry.split('/');
-  const valid = digits.length >= 13 && /^\d{2}\/\d{2}$/.test(expiry);
+  const valid = isCard
+    ? digits.length >= 13 && /^\d{2}\/\d{2}$/.test(expiry)
+    : accountLabel.trim().length > 0;
+
+  const title = isCard
+    ? t('account', 'addCard')
+    : kind === 'paypal'
+      ? t('account', 'addPaypal')
+      : t('account', 'addApplePay');
 
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
-      const card = await api.post<SavedCard>('/api/cards', {
-        number: digits,
-        expMonth: Number(month),
-        // Two-digit years are stored as full years so comparisons stay simple.
-        expYear: 2000 + Number(year),
+      const method = await api.post<PaymentMethod>('/api/cards', {
+        kind,
+        ...(isCard
+          ? {
+              number: digits,
+              expMonth: Number(month),
+              // Two-digit years are stored as full years so comparisons stay simple.
+              expYear: 2000 + Number(year),
+            }
+          : { accountLabel: accountLabel.trim() }),
         makeDefault,
       });
       toast(t('account', 'savedSuccess'), 'success');
       setNumber('');
       setExpiry('');
-      onAdded(card);
+      setAccountLabel('');
+      onAdded(method);
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
@@ -188,7 +267,7 @@ function AddCardDialog({
     <Overlay
       open={open}
       onClose={onClose}
-      title={t('account', 'addCard')}
+      title={title}
       size="sm"
       footer={
         <Button fullWidth onClick={submit} loading={busy} disabled={!valid}>
@@ -203,6 +282,34 @@ function AddCardDialog({
       ) : null}
 
       <div className="space-y-4">
+        {/* A wallet has one field — which account it links to. Everything the
+            card path asks for (number, expiry, Luhn) has no counterpart. */}
+        {!isCard ? (
+          <Field
+            label={kind === 'paypal' ? t('account', 'paypalEmail') : t('account', 'applePayDevice')}
+            hint={kind === 'paypal' ? t('account', 'paypalEmailHint') : t('account', 'applePayDeviceHint')}
+            required
+          >
+            {({ id }) => (
+              <Input
+                id={id}
+                type={kind === 'paypal' ? 'email' : 'text'}
+                autoComplete={kind === 'paypal' ? 'email' : 'off'}
+                placeholder={
+                  kind === 'paypal'
+                    ? t('account', 'paypalEmailPlaceholder')
+                    : t('account', 'applePayDevicePlaceholder')
+                }
+                value={accountLabel}
+                onChange={(e) => setAccountLabel(e.target.value)}
+                maxLength={120}
+              />
+            )}
+          </Field>
+        ) : null}
+
+        {isCard ? (
+        <>
         <Field label={t('booking', 'cardNumber')} required>
           {({ id }) => (
             <Input
@@ -235,6 +342,8 @@ function AddCardDialog({
             />
           )}
         </Field>
+        </>
+        ) : null}
 
         <label className={cx('flex cursor-pointer items-center gap-2.5 text-sm text-ink')}>
           <input
@@ -248,7 +357,7 @@ function AddCardDialog({
 
         <p className="flex items-start gap-1.5 text-xs text-ink-muted">
           <Icon name="lock" size={13} className="mt-0.5 shrink-0" />
-          {t('account', 'cardStorageNote')}
+          {isCard ? t('account', 'cardStorageNote') : t('account', 'walletStorageNote')}
         </p>
       </div>
     </Overlay>

@@ -785,16 +785,29 @@ function seedDemoCustomerActivity(db: Database, customer: User, rng: Rng, nextId
     });
   }
 
-  db.cards.push({
-    id: nextId(),
-    userId: customer.id,
-    brand: 'Visa',
-    last4: '4242',
-    expMonth: 11,
-    expYear: new Date().getFullYear() + 3,
-    isDefault: true,
-    createdAt: new Date(Date.now() - 120 * 86_400_000).toISOString(),
-  });
+  db.paymentMethods.push(
+    {
+      id: nextId(),
+      userId: customer.id,
+      kind: 'card',
+      brand: 'Visa',
+      last4: '4242',
+      expMonth: 11,
+      expYear: new Date().getFullYear() + 3,
+      isDefault: true,
+      createdAt: new Date(Date.now() - 120 * 86_400_000).toISOString(),
+    },
+    // A wallet alongside the card, so the payment step is exercised with more
+    // than one shape of method in the list.
+    {
+      id: nextId(),
+      userId: customer.id,
+      kind: 'paypal',
+      accountLabel: customer.email,
+      isDefault: false,
+      createdAt: new Date(Date.now() - 60 * 86_400_000).toISOString(),
+    },
+  );
 
   db.notifications.push(
     {

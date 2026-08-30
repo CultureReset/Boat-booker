@@ -29,6 +29,8 @@ export interface User {
   firstName: string;
   lastName: string;
   phone?: string;
+  /** Set once a one-time code sent to `phone` has been answered. */
+  phoneVerifiedAt?: string;
   role: UserRole;
   status: UserStatus;
   avatarUrl?: string;
@@ -932,15 +934,29 @@ export interface WishlistItem {
   createdAt: string;
 }
 
-export interface SavedCard {
+/**
+ * How a guest pays.
+ *
+ * `card` is the only kind with an expiry and a last four; the wallets carry an
+ * account label instead — the PayPal address, or the device description Apple
+ * Pay reports. Modelling them as one list rather than three keeps "which one is
+ * the default" a single question, which is what checkout actually asks.
+ */
+export type PaymentMethodKind = 'card' | 'paypal' | 'apple_pay';
+
+export interface PaymentMethod {
   id: ID;
   userId: ID;
-  brand: string;
-  last4: string;
-  expMonth: number;
-  expYear: number;
+  kind: PaymentMethodKind;
   isDefault: boolean;
   createdAt: string;
+  /** Cards only. */
+  brand?: string;
+  last4?: string;
+  expMonth?: number;
+  expYear?: number;
+  /** Wallets only — the PayPal address or the Apple Pay device. */
+  accountLabel?: string;
 }
 
 export type PayoutStatus = 'pending' | 'paid';
@@ -1037,7 +1053,7 @@ export interface Database {
   threads: MessageThread[];
   messages: Message[];
   wishlist: WishlistItem[];
-  cards: SavedCard[];
+  paymentMethods: PaymentMethod[];
   payouts: Payout[];
   availability: AvailabilityBlock[];
   notifications: Notification[];
@@ -1072,7 +1088,7 @@ export const emptyDatabase = (): Database => ({
   threads: [],
   messages: [],
   wishlist: [],
-  cards: [],
+  paymentMethods: [],
   payouts: [],
   availability: [],
   notifications: [],

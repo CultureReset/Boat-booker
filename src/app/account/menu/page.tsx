@@ -56,6 +56,15 @@ export default async function AccountMenuPage() {
           hint: t('account', 'editProfileHint'),
         },
         { href: `/profile/view/${user.id}`, label: t('account', 'publicProfile'), icon: 'eye' },
+        {
+          href: '/finish-registration?next=/account/menu',
+          label: t('login', 'phoneLabel'),
+          icon: 'phone',
+          // An unconfirmed number is the one row here that wants attention;
+          // a confirmed one just shows itself.
+          value: user.phoneVerifiedAt ? (user.phone ?? undefined) : undefined,
+          badge: user.phoneVerifiedAt ? undefined : t('general', 'required'),
+        },
         { href: '/account/notifications', label: t('notifications', 'title'), icon: 'bell' },
         { href: '/account/settings', label: t('navigation', 'settings'), icon: 'settings' },
       ],

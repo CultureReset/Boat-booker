@@ -10,7 +10,8 @@ import { api, errorMessage } from '@/lib/client/api';
 import { usePreferences } from '@/components/providers/PreferencesProvider';
 import { useSession } from '@/components/providers/SessionProvider';
 import type { CharterDetail } from '@/lib/services/charters';
-import type { PaymentMode, PriceBreakdown, SavedCard } from '@/lib/domain/types';
+import type { PaymentMethod, PaymentMode, PriceBreakdown } from '@/lib/domain/types';
+import { describe, iconFor } from '@/lib/domain/paymentMethods';
 import { Icon } from '@/components/ui/Icon';
 import { Button, Checkbox, Field, Input, PhotoFrame, Textarea } from '@/components/ui/primitives';
 import { cx } from '@/components/ui/cx';
@@ -90,7 +91,7 @@ export function Checkout({
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
 
-  const [cards, setCards] = useState<SavedCard[]>([]);
+  const [cards, setCards] = useState<PaymentMethod[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string>('');
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
@@ -114,7 +115,7 @@ export function Checkout({
   useEffect(() => {
     if (!user) return;
     api
-      .get<SavedCard[]>('/api/cards')
+      .get<PaymentMethod[]>('/api/cards')
       .then((result) => {
         setCards(result);
         setSelectedCardId(result.find((c) => c.isDefault)?.id ?? result[0]?.id ?? '');
@@ -532,13 +533,16 @@ export function Checkout({
                                 onChange={() => setSelectedCardId(card.id)}
                                 className="h-4 w-4 border-line text-brand-600"
                               />
-                              <Icon name="card" size={18} className="text-ink-muted" />
-                              <span className="flex-1 text-sm text-ink">
-                                {t('account', 'cardEndingIn', { brand: card.brand, last4: card.last4 })}
+                              <Icon name={iconFor(card)} size={18} className="text-ink-muted" />
+                              <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                                {describe(card).title} {describe(card).detail}
                               </span>
-                              <span className="text-xs text-ink-muted">
-                                {String(card.expMonth).padStart(2, '0')}/{String(card.expYear).slice(-2)}
-                              </span>
+                              {/* Only a card has an expiry to show. */}
+                              {card.kind === 'card' && card.expMonth && card.expYear ? (
+                                <span className="shrink-0 text-xs text-ink-muted">
+                                  {String(card.expMonth).padStart(2, '0')}/{String(card.expYear).slice(-2)}
+                                </span>
+                              ) : null}
                             </label>
                           ))}
 

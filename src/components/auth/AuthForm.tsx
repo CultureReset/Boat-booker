@@ -8,7 +8,7 @@ import { passwordRules } from '@/lib/auth/password';
 import { api, errorMessage } from '@/lib/client/api';
 import { useSession } from '@/components/providers/SessionProvider';
 import { Icon } from '@/components/ui/Icon';
-import { Button, Field, Input, RichText } from '@/components/ui/primitives';
+import { Button, Checkbox, Field, Input, RichText } from '@/components/ui/primitives';
 import { cx } from '@/components/ui/cx';
 import type { PublicUser } from '@/lib/auth/session';
 
@@ -70,6 +70,14 @@ export function AuthForm({
   const [companyName, setCompanyName] = useState('');
 
   const [showPassword, setShowPassword] = useState(false);
+  /**
+   * Whether this signup sets a password at all.
+   *
+   * Off by default: the account works without one — signing in is an emailed
+   * link — and asking a guest to invent a password on the way to a booking is
+   * the step most of them abandon at. One can be set later from settings.
+   */
+  const [wantsPassword, setWantsPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [magicLinkUrl, setMagicLinkUrl] = useState<string | null>(null);
@@ -123,7 +131,7 @@ export function AuthForm({
 
     if (!firstName.trim()) return setError(t('login', 'errorFirstNameRequired'));
     if (!lastName.trim()) return setError(t('login', 'errorLastNameRequired'));
-    if (!passwordValid) return setError(t('login', 'passwordMinLength'));
+    if (wantsPassword && !passwordValid) return setError(t('login', 'passwordMinLength'));
     if (accountType === 'owner' && !companyName.trim()) {
       return setError(t('login', 'companyName'));
     }
@@ -132,7 +140,7 @@ export function AuthForm({
     try {
       const result = await api.post<{ user: PublicUser }>('/api/auth/signup', {
         email,
-        password,
+        password: wantsPassword ? password : undefined,
         firstName,
         lastName,
         phone,
@@ -377,44 +385,61 @@ export function AuthForm({
           )}
         </Field>
 
-        <Field label={t('login', 'password')} required>
-          {({ id }) => (
-            <div className="relative">
-              <Input
-                id={id}
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="pr-11"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? t('login', 'hidePassword') : t('login', 'showPassword')}
-                className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded text-ink-muted hover:text-ink"
-              >
-                <Icon name={showPassword ? 'eye-off' : 'eye'} size={18} />
-              </button>
-            </div>
-          )}
-        </Field>
+        <Checkbox
+          checked={wantsPassword}
+          onChange={(e) => setWantsPassword(e.target.checked)}
+          label={t('login', 'createPassword')}
+          description={t('login', 'createPasswordHint')}
+        />
 
-        {/* Live checklist so the requirement is visible before submitting. */}
-        <ul className="-mt-1 grid gap-1 sm:grid-cols-2">
-          {ruleState.map((rule) => (
-            <li
-              key={rule.key}
-              className={cx('flex items-center gap-1.5 text-xs', rule.met ? 'text-success' : 'text-ink-muted')}
-            >
-              <Icon name={rule.met ? 'check-circle' : 'info'} size={13} />
-              {t('login', rule.key)}
-            </li>
-          ))}
-        </ul>
+        {wantsPassword ? (
+          <>
+            <Field label={t('login', 'password')} required>
+              {({ id }) => (
+                <div className="relative">
+                  <Input
+                    id={id}
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pr-11"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? t('login', 'hidePassword') : t('login', 'showPassword')}
+                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded text-ink-muted hover:text-ink"
+                  >
+                    <Icon name={showPassword ? 'eye-off' : 'eye'} size={18} />
+                  </button>
+                </div>
+              )}
+            </Field>
 
-        <Button type="submit" fullWidth size="lg" loading={busy} disabled={!passwordValid}>
+            {/* Live checklist so the requirement is visible before submitting. */}
+            <ul className="-mt-1 grid gap-1 sm:grid-cols-2">
+              {ruleState.map((rule) => (
+                <li
+                  key={rule.key}
+                  className={cx('flex items-center gap-1.5 text-xs', rule.met ? 'text-success' : 'text-ink-muted')}
+                >
+                  <Icon name={rule.met ? 'check-circle' : 'info'} size={13} />
+                  {t('login', rule.key)}
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+
+        <Button
+          type="submit"
+          fullWidth
+          size="lg"
+          loading={busy}
+          disabled={wantsPassword && !passwordValid}
+        >
           {busy ? t('login', 'creatingAccount') : t('login', 'signup')}
         </Button>
 

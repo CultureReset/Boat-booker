@@ -305,6 +305,100 @@ async function main(): Promise<void> {
   });
   check('invalid card number is rejected', badCard.status === 400, badCard);
 
+  const expiredCard = await customer.post('/api/cards', {
+    number: '4242424242424242',
+    expMonth: 1,
+    expYear: new Date().getFullYear() - 1,
+  });
+  check('an expired card is rejected', expiredCard.status === 400, expiredCard);
+
+  // ------------------------------------------------------- wallets
+  const wallet = await customer.post<{ id: string; kind: string; accountLabel: string }>(
+    '/api/cards',
+    { kind: 'paypal', accountLabel: 'smoke@example.com' },
+  );
+  check('a PayPal wallet is saved', wallet.status === 201 && wallet.data?.kind === 'paypal', wallet.error);
+  check('the wallet keeps only the account label', wallet.data?.accountLabel === 'smoke@example.com');
+
+  const badWallet = await customer.post('/api/cards', {
+    kind: 'paypal',
+    accountLabel: 'not-an-address',
+  });
+  check('a PayPal wallet needs a real address', badWallet.status === 400, badWallet);
+
+  // One wallet per kind: linking again re-points the same one rather than
+  // adding a second way to pay through the same account.
+  const relinked = await customer.post<{ id: string }>('/api/cards', {
+    kind: 'paypal',
+    accountLabel: 'smoke2@example.com',
+  });
+  check('re-linking PayPal updates the same wallet', relinked.data?.id === wallet.data.id, relinked.data);
+
+  const methods = await customer.get<{ id: string; kind: string }[]>('/api/cards');
+  check(
+    'cards and wallets come back in one list',
+    methods.data?.some((m) => m.kind === 'card') && methods.data?.some((m) => m.kind === 'paypal'),
+    methods.data?.map((m) => m.kind),
+  );
+
+  const promoted = await customer.patch('/api/cards', { methodId: wallet.data.id });
+  check('a wallet can be made the default', promoted.status === 200, promoted.error);
+
+  const afterPromote = await customer.get<{ id: string; isDefault: boolean }[]>('/api/cards');
+  check(
+    'exactly one method is default',
+    afterPromote.data?.filter((m) => m.isDefault).length === 1,
+    afterPromote.data,
+  );
+
+  await customer.del(`/api/cards?id=${wallet.data.id}`);
+  const afterRemove = await customer.get<{ id: string; isDefault: boolean }[]>('/api/cards');
+  check(
+    'removing the default promotes another',
+    afterRemove.data?.length === 0 || afterRemove.data.some((m) => m.isDefault),
+    afterRemove.data,
+  );
+
+  // --------------------------------------------------- phone verification
+  section('Phone verification');
+  const phoneStatus = await customer.get<{ verified: boolean; cooldownSeconds: number }>(
+    '/api/auth/phone',
+  );
+  check('phone status responds', phoneStatus.status === 200, phoneStatus.error);
+
+  const badNumber = await customer.post('/api/auth/phone', { action: 'send', phone: '123' });
+  check('a too-short number is refused', badNumber.status === 400, badNumber);
+
+  const codeSent = await customer.post<{ sent: boolean; code?: string; resendAfterSeconds: number }>(
+    '/api/auth/phone',
+    { action: 'send', phone: '+1 555 0142' },
+  );
+  check('a code is sent', codeSent.data?.sent === true, codeSent.error);
+  check('the response carries a resend cooldown', (codeSent.data?.resendAfterSeconds ?? 0) > 0);
+
+  const tooSoon = await customer.post('/api/auth/phone', { action: 'send', phone: '+1 555 0142' });
+  check('resending inside the cooldown is refused', tooSoon.status === 429, tooSoon);
+
+  const wrongCode = await customer.post('/api/auth/phone', { action: 'verify', code: '000001' });
+  check('a wrong code is refused', wrongCode.status === 400, wrongCode);
+
+  // The code is only in the response because this build has no SMS transport;
+  // AUTH_EXPOSE_MAGIC_LINK=false removes it, and this assertion with it.
+  if (codeSent.data?.code) {
+    const verified = await customer.post<{ verified: boolean; user: { phone: string } }>(
+      '/api/auth/phone',
+      { action: 'verify', code: codeSent.data.code },
+    );
+    check('the right code verifies', verified.data?.verified === true, verified.error);
+    check('the number lands on the account', verified.data?.user?.phone === '+15550142', verified.data?.user);
+
+    const replay = await customer.post('/api/auth/phone', {
+      action: 'verify',
+      code: codeSent.data.code,
+    });
+    check('a used code cannot be replayed', replay.status >= 400, replay);
+  }
+
   const profile = await customer.patch<{ user: { bio: string } }>('/api/me', {
     bio: 'Smoke test bio',
     currency: 'EUR',

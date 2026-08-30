@@ -36,7 +36,8 @@ export function BalanceFlow({
 }: {
   data: BalanceData;
   token: string;
-  savedCard: { brand: string; last4: string; expired: boolean } | null;
+  /** `title` names the instrument, `detail` says which one — see domain/paymentMethods. */
+  savedCard: { title: string; detail: string; expired: boolean } | null;
   processingFee: number;
 }) {
   const router = useRouter();
@@ -120,7 +121,7 @@ export function BalanceFlow({
         <p className="mt-3 text-sm text-ink-soft">
           {t('pay', 'savedPaymentMethod')}{' '}
           <span className="font-semibold text-ink">
-            {savedCard.brand} ···· {savedCard.last4}
+            {savedCard.title}{savedCard.detail ? ` ${savedCard.detail}` : ''}
           </span>
         </p>
       ) : null}

@@ -31,7 +31,12 @@ export async function POST(request: Request) {
   const email = body.email?.trim().toLowerCase() ?? '';
   const firstName = body.firstName?.trim() ?? '';
   const lastName = body.lastName?.trim() ?? '';
+  // A password is optional: an account can be created with none and signed
+  // into by emailed link, which is how guest checkout works. Someone who wants
+  // one can set it here or later from settings — `changePassword` treats a
+  // first password as a change with nothing to verify against.
   const password = body.password ?? '';
+  const wantsPassword = password.length > 0;
   const accountType = body.accountType === 'owner' ? 'owner' : 'customer';
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -40,9 +45,11 @@ export async function POST(request: Request) {
   if (!firstName) return fail('invalid_first_name', 'First name is required.', 400);
   if (!lastName) return fail('invalid_last_name', 'Last name is required.', 400);
 
-  const strength = validatePassword(password);
-  if (!strength.valid) {
-    return fail('weak_password', 'Password does not meet requirements', 400, strength.failed);
+  if (wantsPassword) {
+    const strength = validatePassword(password);
+    if (!strength.valid) {
+      return fail('weak_password', 'Password does not meet requirements', 400, strength.failed);
+    }
   }
 
   if (accountType === 'owner' && !body.companyName?.trim()) {
@@ -54,7 +61,7 @@ export async function POST(request: Request) {
     return fail('email_taken', 'An account with this email already exists.', 409);
   }
 
-  const credentials = hashPassword(password);
+  const credentials = wantsPassword ? hashPassword(password) : null;
   const now = new Date().toISOString();
   const referrer = body.referralCode
     ? db.users.find((u) => u.referralCode === body.referralCode?.trim().toUpperCase())
@@ -63,8 +70,8 @@ export async function POST(request: Request) {
   const user: User = {
     id: newId(),
     email,
-    passwordHash: credentials.hash,
-    passwordSalt: credentials.salt,
+    passwordHash: credentials?.hash,
+    passwordSalt: credentials?.salt,
     firstName: firstName.slice(0, 60),
     lastName: lastName.slice(0, 60),
     phone: body.phone?.trim().slice(0, 40),

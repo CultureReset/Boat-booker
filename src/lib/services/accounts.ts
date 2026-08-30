@@ -3,7 +3,7 @@ import { currencyByCode, languageByCode } from '@/config/locale';
 import { newId } from '@/lib/core/ids';
 import { roundMoney } from '@/lib/core/money';
 import { hashPassword, validatePassword, verifyPassword } from '@/lib/auth/password';
-import type { Database, SavedCard, User } from '@/lib/domain/types';
+import type { Database, PaymentMethod, PaymentMethodKind, User } from '@/lib/domain/types';
 import { loyaltyTierFor } from './pricing';
 
 /**
@@ -176,7 +176,7 @@ export function deleteAccount(db: Database, userId: string): void {
   user.passwordSalt = undefined;
 
   db.sessions = db.sessions.filter((s) => s.userId !== userId);
-  db.cards = db.cards.filter((c) => c.userId !== userId);
+  db.paymentMethods = db.paymentMethods.filter((c) => c.userId !== userId);
   db.wishlist = db.wishlist.filter((w) => w.userId !== userId);
 }
 
@@ -210,7 +210,7 @@ export function addCard(
   db: Database,
   userId: string,
   input: { number: string; expMonth: number; expYear: number; makeDefault?: boolean },
-): SavedCard {
+): PaymentMethod {
   requireUser(db, userId);
 
   const digits = input.number.replace(/\D/g, '');
@@ -225,48 +225,98 @@ export function addCard(
     throw new AccountError('invalid', 'That expiry date has passed');
   }
 
-  const card: SavedCard = {
+  const card: PaymentMethod = {
     id: newId(),
     userId,
+    kind: 'card',
     brand: CARD_BRANDS.find((b) => b.pattern.test(digits))?.brand ?? 'Card',
     // Only the last four digits are ever persisted — the PAN is discarded here
     // and never written to the snapshot.
     last4: digits.slice(-4),
     expMonth: input.expMonth,
     expYear: input.expYear,
-    isDefault: input.makeDefault ?? db.cards.filter((c) => c.userId === userId).length === 0,
+    isDefault: input.makeDefault ?? db.paymentMethods.filter((c) => c.userId === userId).length === 0,
     createdAt: new Date().toISOString(),
   };
 
   if (card.isDefault) {
-    for (const existing of db.cards) {
+    for (const existing of db.paymentMethods) {
       if (existing.userId === userId) existing.isDefault = false;
     }
   }
 
-  db.cards.push(card);
+  db.paymentMethods.push(card);
   return card;
 }
 
-export function removeCard(db: Database, userId: string, cardId: string): void {
-  const card = db.cards.find((c) => c.id === cardId);
-  if (!card) throw new AccountError('not_found', 'Card not found');
-  if (card.userId !== userId) throw new AccountError('forbidden', 'Not your card');
+/**
+ * Saves a wallet — PayPal or Apple Pay.
+ *
+ * No number, no expiry, nothing to validate against Luhn: the wallet holds the
+ * instrument and hands back an account label. What is stored here is that
+ * label and nothing else, the same discipline the card path follows.
+ */
+export function addWallet(
+  db: Database,
+  userId: string,
+  input: { kind: Exclude<PaymentMethodKind, 'card'>; accountLabel: string; makeDefault?: boolean },
+): PaymentMethod {
+  requireUser(db, userId);
 
-  db.cards = db.cards.filter((c) => c.id !== cardId);
+  const label = input.accountLabel.trim().slice(0, 120);
+  if (!label) throw new AccountError('invalid', 'That wallet needs an account to link to');
 
-  // Promote another card so the account is never left without a default.
-  const remaining = db.cards.filter((c) => c.userId === userId);
-  if (card.isDefault && remaining.length) remaining[0].isDefault = true;
+  if (input.kind === 'paypal' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(label)) {
+    throw new AccountError('invalid', 'Enter the email address on the PayPal account');
+  }
+
+  // One wallet per kind per account: a second PayPal address is the same
+  // wallet re-linked, not a second way to pay.
+  const existing = db.paymentMethods.find((m) => m.userId === userId && m.kind === input.kind);
+  if (existing) {
+    existing.accountLabel = label;
+    if (input.makeDefault) setDefaultPaymentMethod(db, userId, existing.id);
+    return existing;
+  }
+
+  const wallet: PaymentMethod = {
+    id: newId(),
+    userId,
+    kind: input.kind,
+    accountLabel: label,
+    isDefault: input.makeDefault ?? db.paymentMethods.filter((m) => m.userId === userId).length === 0,
+    createdAt: new Date().toISOString(),
+  };
+
+  if (wallet.isDefault) {
+    for (const other of db.paymentMethods) {
+      if (other.userId === userId) other.isDefault = false;
+    }
+  }
+
+  db.paymentMethods.push(wallet);
+  return wallet;
 }
 
-export function setDefaultCard(db: Database, userId: string, cardId: string): void {
-  const card = db.cards.find((c) => c.id === cardId);
-  if (!card) throw new AccountError('not_found', 'Card not found');
-  if (card.userId !== userId) throw new AccountError('forbidden', 'Not your card');
+export function removePaymentMethod(db: Database, userId: string, methodId: string): void {
+  const method = db.paymentMethods.find((c) => c.id === methodId);
+  if (!method) throw new AccountError('not_found', 'Payment method not found');
+  if (method.userId !== userId) throw new AccountError('forbidden', 'Not yours');
 
-  for (const existing of db.cards) {
-    if (existing.userId === userId) existing.isDefault = existing.id === cardId;
+  db.paymentMethods = db.paymentMethods.filter((c) => c.id !== methodId);
+
+  // Promote another one so the account is never left without a default.
+  const remaining = db.paymentMethods.filter((c) => c.userId === userId);
+  if (method.isDefault && remaining.length) remaining[0].isDefault = true;
+}
+
+export function setDefaultPaymentMethod(db: Database, userId: string, methodId: string): void {
+  const method = db.paymentMethods.find((c) => c.id === methodId);
+  if (!method) throw new AccountError('not_found', 'Payment method not found');
+  if (method.userId !== userId) throw new AccountError('forbidden', 'Not yours');
+
+  for (const existing of db.paymentMethods) {
+    if (existing.userId === userId) existing.isDefault = existing.id === methodId;
   }
 }
 

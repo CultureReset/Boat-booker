@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { translate as t } from '@/i18n/translate';
 import { currentUser } from '@/lib/auth/session';
 import { getDb } from '@/lib/storage';
+import { describe, isExpired } from '@/lib/domain/paymentMethods';
 import { PaymentError, processingFeeFor, resolvePaymentToken } from '@/lib/services/payments';
 import { BalanceFlow } from '@/components/payments/BalanceFlow';
 import { Outcome } from '@/components/payments/TipFlow';
@@ -43,19 +44,13 @@ export default async function PayBalancePage({
     const context = resolvePaymentToken(db, token);
     const viewer = await currentUser();
 
-    // The saved card is only surfaced to the account that owns it — a
-    // forwarded link must not reveal someone else's payment method.
-    const card =
+    // The saved method is only surfaced to the account that owns it — a
+    // forwarded link must not reveal someone else's way of paying.
+    const method =
       viewer?.id === context.booking.customerId
-        ? db.cards.find((c) => c.id === context.booking.paymentMethodId) ??
-          db.cards.find((c) => c.userId === viewer.id && c.isDefault)
+        ? db.paymentMethods.find((c) => c.id === context.booking.paymentMethodId) ??
+          db.paymentMethods.find((c) => c.userId === viewer.id && c.isDefault)
         : undefined;
-
-    const now = new Date();
-    const expired = card
-      ? card.expYear < now.getUTCFullYear() ||
-        (card.expYear === now.getUTCFullYear() && card.expMonth < now.getUTCMonth() + 1)
-      : false;
 
     return (
       <Shell>
@@ -70,7 +65,7 @@ export default async function PayBalancePage({
             captainName: context.captainName,
           }}
           token={token}
-          savedCard={card ? { brand: card.brand, last4: card.last4, expired } : null}
+          savedCard={method ? { ...describe(method), expired: isExpired(method) } : null}
           processingFee={processingFeeFor(context.charter, context.booking.balance.outstanding)}
         />
       </Shell>

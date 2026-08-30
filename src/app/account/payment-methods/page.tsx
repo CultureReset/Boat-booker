@@ -11,7 +11,7 @@ export default async function PaymentMethodsPage() {
   const user = (await currentUser())!;
   const db = await getDb();
 
-  const cards = db.cards
+  const cards = db.paymentMethods
     .filter((card) => card.userId === user.id)
     .sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
 

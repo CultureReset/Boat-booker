@@ -2,6 +2,7 @@ import { commerceConfig } from '@/config/brand';
 import { addDays, today } from '@/lib/core/dates';
 import { newId } from '@/lib/core/ids';
 import { roundMoney } from '@/lib/core/money';
+import { isExpired } from '@/lib/domain/paymentMethods';
 import type { Booking, Charter, Database } from '@/lib/domain/types';
 import { notify } from './notifications';
 
@@ -317,13 +318,9 @@ export function settleScheduledBalances(db: Database): number {
     if (balance.mode !== 'scheduled' || balance.paidAt || !balance.scheduledFor) continue;
     if (balance.scheduledFor > cutoff) continue;
 
-    const card = db.cards.find((c) => c.id === booking.paymentMethodId);
-    const expired =
-      card &&
-      (card.expYear < Number(cutoff.slice(0, 4)) ||
-        (card.expYear === Number(cutoff.slice(0, 4)) && card.expMonth < Number(cutoff.slice(5, 7))));
+    const method = db.paymentMethods.find((c) => c.id === booking.paymentMethodId);
 
-    if (!card || expired) {
+    if (!method || isExpired(method, new Date(cutoff))) {
       balance.lastAttemptFailedAt = new Date().toISOString();
       balance.mode = 'online_anytime';
       notify(db, booking.customerId, {
