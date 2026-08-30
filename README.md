@@ -62,6 +62,8 @@ the authorisation boundaries hold at each step.
   shapes
 - [`docs/MOBILE.md`](docs/MOBILE.md) — PWA, responsive strategy, Capacitor
   packaging
+- [`docs/ANDROID-MAP.md`](docs/ANDROID-MAP.md) — what the two real Android
+  apps look like, and the 14 places this rebuild diverges from them
 
 ## Modularity
 
