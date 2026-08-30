@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { brand } from '@/config/brand';
 import { translate as t } from '@/i18n/translate';
 import { currentUser } from '@/lib/auth/session';
 import { getDb } from '@/lib/storage';
@@ -30,12 +31,15 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
     { href: '/owner/calendar', label: t('navigation', 'multicalendar'), icon: 'calendar' },
     { href: '/owner/listings', label: t('navigation', 'listings'), icon: 'boat' },
     { href: '/owner/reviews', label: t('navigation', 'reviews'), icon: 'star-empty' },
+    { href: '/owner/quick-replies', label: t('quickReplies', 'title'), icon: 'bolt' },
+    { href: '/owner/performance', label: t('performance', 'title'), icon: 'chart' },
     { href: '/owner/payouts', label: t('navigation', 'payouts'), icon: 'wallet', groupStart: true },
     { href: '/owner/payout-methods', label: t('navigation', 'payoutMethods'), icon: 'card' },
     { href: '/owner/team', label: t('navigation', 'crewMembers'), icon: 'users' },
     { href: '/owner/verification', label: t('navigation', 'verification'), icon: 'shield' },
     { href: '/owner/widgets', label: t('navigation', 'widgets'), icon: 'grid' },
-    { href: '/owner/opportunities', label: t('navigation', 'opportunities'), icon: 'bolt' },
+    { href: '/owner/opportunities', label: t('navigation', 'opportunities'), icon: 'plus' },
+    { href: '/owner/direct', label: t('direct', 'title', { brand: brand.name }), icon: 'external' },
     { href: '/owner/settings', label: t('navigation', 'settings'), icon: 'settings' },
   ];
 
