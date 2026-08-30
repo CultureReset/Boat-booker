@@ -823,6 +823,111 @@ export const catalog = {
     useThisReply: 'Use this reply',
   },
 
+  memories: {
+    indexTitle: 'Your boating memories',
+    indexSubtitle: 'The best moments from your trips.',
+    seeMemory: 'See your memory',
+    replay: 'Replay',
+    next: 'Next',
+    back: 'Back',
+    returnHome: 'Return home',
+
+    introGreeting: 'Hey %name%',
+    introDescription: 'We’ve put together a memory of your boating adventure.',
+    yearsAgo: '{0}A recent trip|{1}One year ago|[2,Inf]%years% years ago',
+
+    theTripTitle: 'This was your',
+    theTripGuests: '{1}%count% guest|[2,Inf]%count% guests',
+
+    othersEnjoyedTitle: 'You picked a trip other boaters enjoyed too',
+    othersEnjoyedBody: '{0}You were among the first|{1}%count% other guest has taken it since|[2,Inf]%count% other guests have taken it since',
+
+    reputationTitle: 'Your captain’s reputation keeps growing',
+    reputationBody:
+      'Since your trip, %captain% has picked up %count% more reviews averaging %score%.',
+    reputationNone: 'Since your trip, %captain% has kept the boat busy.',
+
+    sameDatesTitle: 'The same dates, this time round',
+    sameDatesCaptainMessage: '“Pick your date, %name% — I’ll hold your spot.”',
+    sameDatesFullyBooked: 'These dates are fully booked',
+    sameDatesFullyBookedMessage: '“Hi %name%, we’re busy that week — see my other dates.”',
+    loyaltyBadge: '%percent%% off with your loyalty discount',
+    viewFullCalendar: 'View full calendar',
+
+    similarTitle: 'Feeling adventurous?',
+    similarBody: 'Other boats worth a look in %destination%.',
+    seeAllCharters: 'See all charters',
+
+    outroTitle: 'Create new memories on the water',
+    outroCta: 'Book again',
+
+    errorTitle: 'Trip off the radar',
+    errorBody: 'We’ve searched the seven seas but couldn’t find this boating memory.',
+    notEligibleTitle: 'No memory yet',
+    notEligibleBody: 'Memories are made once a trip has happened. Yours is still ahead of you.',
+    emptyTitle: 'No memories yet',
+    emptyBody: 'Once you’ve been out on the water, your trips will show up here.',
+  },
+
+  sharedWishlist: {
+    title: 'Shared wishlist',
+    ownerTitle: '%name%’s wishlist',
+    savedCount: '{0}Nothing saved yet|{1}%count% boat saved|[2,Inf]%count% boats saved',
+    emptyTitle: 'No saved boats yet',
+    emptyBody: 'When your friend saves a boat, it will show up here.',
+    errorTitle: 'Wishlist unavailable',
+    errorBody: 'We’re sorry — this shared wishlist is no longer available.',
+    share: 'Share this list',
+    shareCopied: 'Link copied',
+    stopSharing: 'Stop sharing',
+    shareBody: 'Anyone with the link can see the boats you have saved.',
+  },
+
+  buddies: {
+    title: 'Invite your crew',
+    subtitle: 'Add the people coming with you so they get the trip details too.',
+    emailsLabel: 'Email addresses',
+    emailsHint: 'Separate multiple addresses with a comma.',
+    invite: 'Send invites',
+    invited: 'Invited',
+    sent: 'Invites sent.',
+    emptyBody: 'Nobody invited yet.',
+  },
+
+  catches: {
+    title: 'Catches',
+    subtitle: 'Recent trips and what people found out there.',
+    metaTitle: 'Catches: see what’s happening on the water',
+    filterMonths: 'Filter by month',
+    filterMonthsHint: 'Pick one or more months to compare.',
+    allMonths: 'All months',
+    spring: 'Spring',
+    summer: 'Summer',
+    fall: 'Autumn',
+    winter: 'Winter',
+    clearFilters: 'Clear all',
+    noResults: 'No results for these filters',
+    noResultsBody: 'Showing the latest trips from everywhere instead.',
+    loadMore: 'Load more',
+    searchTitle: 'Search by location, captain or charter',
+    like: 'Like',
+    share: 'Share',
+    today: 'Today',
+    yesterday: 'Yesterday',
+    daysAgo: '%days% days ago',
+    signInTitle: 'See more',
+    signInBody: 'Sign in or create a free account to see more trips from around the world.',
+  },
+
+  profile: {
+    memberSince: 'Member since %date%',
+    tripsTaken: '{0}No trips yet|{1}1 trip|[2,Inf]%count% trips',
+    reviewsWritten: '{0}No reviews yet|{1}1 review|[2,Inf]%count% reviews',
+    listingsTitle: 'Listings',
+    reviewsTitle: 'Reviews written',
+    notFound: 'That profile does not exist.',
+  },
+
   performance: {
     title: 'Performance',
     subtitle: 'How your listings are doing, and where the drop-off is.',

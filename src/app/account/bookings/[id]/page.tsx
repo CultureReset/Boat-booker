@@ -12,6 +12,7 @@ import { Badge, Divider, LinkButton, PhotoFrame } from '@/components/ui/primitiv
 import { BookingActions } from '@/components/account/BookingActions';
 import { ChangeRequestPanel } from '@/components/booking/ChangeBookingFlow';
 import { BalanceCollection } from '@/components/payments/BalanceFlow';
+import { BuddyInvites } from '@/components/account/BuddyInvites';
 
 export const metadata: Metadata = { title: t('bookings', 'viewDetails') };
 
@@ -236,6 +237,29 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
             currency={booking.currency}
             scheduledFor={booking.balance.scheduledFor}
           />
+        ) : null}
+
+        {/* A completed trip is the only place a memory or a review makes
+            sense; a future one gets the crew invite instead. */}
+        {booking.status === 'done' ? (
+          <Link
+            href={`/trip-memory/${booking.id}`}
+            className="flex items-center gap-3 rounded-card border border-line bg-white p-3 transition-colors hover:bg-surface-sunken"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700">
+              <Icon name="star" size={17} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-ink">
+                {t('memories', 'indexTitle')}
+              </span>
+              <span className="block text-xs text-ink-muted">
+                {t('memories', 'indexSubtitle')}
+              </span>
+            </span>
+          </Link>
+        ) : booking.canRequestChange ? (
+          <BuddyInvites bookingId={booking.id} invitations={booking.buddyInvitations} />
         ) : null}
 
         {booking.changeRequest ? (

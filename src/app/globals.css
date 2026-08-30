@@ -86,3 +86,33 @@
   .line-clamp-2 { -webkit-line-clamp: 2; }
   .line-clamp-3 { -webkit-line-clamp: 3; }
 }
+
+/*
+ * Scene transition for the trip-memory player.
+ *
+ * Defined here rather than inline because it has to be suppressible: the
+ * player checks prefers-reduced-motion and drops the class entirely, and the
+ * media query below is the belt to that braces for anyone who changes the
+ * setting mid-session.
+ */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
