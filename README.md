@@ -69,6 +69,19 @@ mispriced against a stored total, and a booking blocking its own extension.
 uses a string with a `%placeholder%` but passes no values — the bug class that
 put a literal `Booked %date%` on the booking screen.
 
+```bash
+npm install --no-save playwright-core
+npm run tour         # 49 screens at a Pixel-7 viewport, into .tour/
+```
+
+`npm run tour` walks every screen signed in as each demo account and writes a
+screenshot per screen, reporting bad statuses and console errors. It exists
+because the bugs that matter on a phone do not fail a build: a dashboard
+collapsing to one column, a composer floating above a gutter, a payout table
+that only scrolls sideways, two copies of a heading. Every one of those passed
+typecheck, the i18n check and the build, and was found by looking at these
+screenshots.
+
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the layers fit together
