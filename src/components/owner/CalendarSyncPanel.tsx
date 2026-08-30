@@ -62,8 +62,7 @@ export function CalendarSyncPanel({
     <div className="space-y-6">
       {/* ------------------------------------------------ external feeds */}
       <section>
-        <h2 className="text-sm font-bold text-ink">{t('calendarSync', 'title')}</h2>
-        <p className="mb-2 text-xs text-ink-muted">{t('calendarSync', 'subtitle')}</p>
+        <h2 className="mb-2 text-sm font-bold text-ink">{t('calendarSync', 'feedsTitle')}</h2>
 
         {calendars.length === 0 ? (
           <EmptyState

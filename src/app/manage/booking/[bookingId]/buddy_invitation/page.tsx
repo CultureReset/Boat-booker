@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { translate as t } from '@/i18n/translate';
@@ -20,7 +20,9 @@ export default async function BuddyInvitationPage({
   params: Promise<{ bookingId: string }>;
 }) {
   const { bookingId } = await params;
-  const user = (await currentUser())!;
+  const user = await currentUser();
+  if (!user) redirect(`/login?next=/manage/booking/${bookingId}/buddy_invitation`);
+
   const db = await getDb();
 
   const booking = db.bookings.find((b) => b.id === bookingId && b.customerId === user.id);

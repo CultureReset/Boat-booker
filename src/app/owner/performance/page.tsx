@@ -117,7 +117,9 @@ export default async function PerformancePage({
       ) : null}
 
       {/* Metrics */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Two up even on the narrowest phone, matching the dashboard tiles — a
+          single column turns eight metrics into eight screens of scrolling. */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {report.metrics.map((metric) => (
           <div key={metric.key} className="rounded-card border border-line bg-white p-4">
             <p className="text-xs font-semibold text-ink-muted">

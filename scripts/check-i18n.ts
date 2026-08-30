@@ -13,8 +13,29 @@ import { catalog } from '../src/i18n/catalog';
 
 const SRC = join(process.cwd(), 'src');
 
-/** Matches t('domain', 'key') and translate('domain', 'key'). */
-const CALL = /\bt(?:ranslate)?\(\s*'([a-zA-Z]+)'\s*,\s*'([a-zA-Z0-9_]+)'/g;
+/**
+ * Matches t('domain', 'key') and translate('domain', 'key').
+ *
+ * The third group captures the comma that would introduce a values object, so
+ * a call site can be checked against whether its string needs one.
+ */
+const CALL = /\bt(?:ranslate)?\(\s*'([a-zA-Z]+)'\s*,\s*'([a-zA-Z0-9_]+)'\s*(,?)/g;
+
+const PLACEHOLDER = /%([a-zA-Z][a-zA-Z0-9_]*)%/g;
+
+/**
+ * Substitutions `interpolate()` fills in on its own — a call site never has to
+ * pass these, so a string using only these needs no values object.
+ */
+const AMBIENT = new Set(['brand', 'brandLegal', 'year', 'phone', 'p']);
+
+/** `{0}one|{1}other` plural forms, which are selected by `count`. */
+const PLURAL = /\{\d+\}|\[\d+,/;
+
+/** Substitutions the caller is on the hook for. */
+function requiredValues(text: string): string[] {
+  return [...text.matchAll(PLACEHOLDER)].map((m) => m[1]).filter((name) => !AMBIENT.has(name));
+}
 
 /** Keys built at runtime rather than written literally. */
 const DYNAMIC_ALLOWLIST = new Set([
@@ -93,6 +114,7 @@ function walk(dir: string, out: string[] = []): string[] {
 const files = walk(SRC);
 const used = new Set<string>();
 const missing: { file: string; domain: string; key: string }[] = [];
+const unfilled: { file: string; domain: string; key: string; text: string }[] = [];
 
 for (const file of files) {
   // The catalog and the translator itself are not call sites.
@@ -100,7 +122,7 @@ for (const file of files) {
 
   const source = readFileSync(file, 'utf8');
   for (const match of source.matchAll(CALL)) {
-    const [, domain, key] = match;
+    const [, domain, key, comma] = match;
     used.add(`${domain}.${key}`);
 
     const bundle = (catalog as Record<string, Record<string, string>>)[domain];
@@ -108,7 +130,19 @@ for (const file of files) {
       missing.push({ file, domain, key });
       continue;
     }
-    if (typeof bundle[key] !== 'string') missing.push({ file, domain, key });
+
+    const text = bundle[key];
+    if (typeof text !== 'string') {
+      missing.push({ file, domain, key });
+      continue;
+    }
+
+    // A string with a substitution but no values object renders the raw
+    // `%date%` to the user. `translate()` cannot detect this — it has nothing
+    // to substitute — so it has to be caught here.
+    if (!comma && (requiredValues(text).length > 0 || PLURAL.test(text))) {
+      unfilled.push({ file, domain, key, text });
+    }
   }
 }
 
@@ -130,10 +164,19 @@ if (missing.length) {
   }
 }
 
+if (unfilled.length) {
+  console.error(`\n${unfilled.length} call site(s) missing substitution values:`);
+  for (const entry of unfilled) {
+    console.error(
+      `  ${entry.domain}.${entry.key}  "${entry.text}"  ←  ${entry.file.replace(process.cwd() + '/', '')}`,
+    );
+  }
+}
+
 if (unused.length) {
   console.log(`\n${unused.length} unreferenced catalog entries (not an error):`);
   console.log('  ' + unused.join(', '));
 }
 
-if (missing.length) process.exit(1);
-console.log('\nNo missing keys.');
+if (missing.length || unfilled.length) process.exit(1);
+console.log('\nNo missing keys, and every substitution is supplied.');

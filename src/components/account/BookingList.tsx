@@ -54,7 +54,19 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
   done: 'statusCompleted',
 };
 
-const TABS = [
+/**
+ * The two sides get different tabs, on purpose.
+ *
+ * An operator triages: everything is either coming up or it is history, so two
+ * tabs with live counts beat five that make them hunt. A guest is looking back
+ * as often as forward, so their bookings split by outcome instead.
+ */
+const OWNER_TABS = [
+  { key: 'upcoming', labelKey: 'upcoming' },
+  { key: 'all', labelKey: 'all' },
+] as const;
+
+const CUSTOMER_TABS = [
   { key: 'upcoming', labelKey: 'upcoming' },
   { key: 'pending', labelKey: 'pending' },
   { key: 'done', labelKey: 'completed' },
@@ -62,7 +74,19 @@ const TABS = [
   { key: 'all', labelKey: 'all' },
 ] as const;
 
-type TabKey = (typeof TABS)[number]['key'];
+type TabKey = (typeof CUSTOMER_TABS)[number]['key'];
+
+/**
+ * "Kevin S." — first name plus last initial.
+ *
+ * The operator sees this on a list of strangers' bookings; the full name is on
+ * the detail screen where they actually need it to check ID.
+ */
+function shortName(full: string): string {
+  const [first, ...rest] = full.trim().split(/\s+/);
+  const last = rest[rest.length - 1];
+  return last ? `${first} ${last[0]}.` : first;
+}
 
 export function BookingList({
   bookings: initial,
@@ -75,6 +99,7 @@ export function BookingList({
   const { toast } = useToast();
 
   const [bookings, setBookings] = useState(initial);
+  const tabs = role === 'owner' ? OWNER_TABS : CUSTOMER_TABS;
   const [tab, setTab] = useState<TabKey>('upcoming');
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<ExpandedBooking | null>(null);
@@ -84,7 +109,12 @@ export function BookingList({
   const matches = (booking: ExpandedBooking, key: TabKey) => {
     switch (key) {
       case 'upcoming':
-        return booking.status === 'confirmed' && booking.date >= today;
+        return role === 'owner'
+          ? booking.date >= today &&
+              ['request', 'pending', 'confirmed', 'accepted', 'change_requested', 'change_pending'].includes(
+                booking.status,
+              )
+          : booking.status === 'confirmed' && booking.date >= today;
       case 'pending':
         return booking.status === 'pending';
       case 'done':
@@ -128,7 +158,7 @@ export function BookingList({
       {/* ------------------------------------------------------- tabs */}
       <div className="-mx-4 mb-4 md:mx-0">
         <div className="rail px-4 md:px-0" role="tablist">
-          {TABS.map((item) => {
+          {tabs.map((item) => {
             const count = bookings.filter((booking) => matches(booking, item.key)).length;
             const selected = tab === item.key;
             return (
@@ -235,12 +265,40 @@ function BookingRow({
   const inboxHref =
     role === 'owner' ? `/owner/inbox/${booking.threadId}` : `/account/inbox/${booking.threadId}`;
 
+  // On a list of strangers the operator only needs "Kevin S."; the full name
+  // lives on the detail screen where they check ID against it.
   const counterparty =
-    role === 'owner' ? booking.customer?.displayName : booking.owner?.displayName;
+    role === 'owner'
+      ? booking.customer?.displayName
+        ? shortName(booking.customer.displayName)
+        : undefined
+      : booking.owner?.displayName;
+
+  const tone = STATUS_TONE[booking.status];
 
   return (
-    <article className="rounded-card border border-line bg-white p-3 shadow-card">
-      <div className="flex gap-3">
+    <article className="overflow-hidden rounded-card border border-line bg-white shadow-card">
+      {/*
+        Status as a full-width header strip rather than an inline pill.
+        On a phone the status is the first thing an operator reads and the pill
+        version puts it last, behind a truncated title.
+      */}
+      <p
+        className={cx(
+          'px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide',
+          tone === 'success'
+            ? 'bg-emerald-50 text-emerald-800'
+            : tone === 'danger'
+              ? 'bg-red-50 text-red-800'
+              : tone === 'brand'
+                ? 'bg-brand-50 text-brand-800'
+                : 'bg-surface-sunken text-ink-soft',
+        )}
+      >
+        {t('bookings', STATUS_LABEL[booking.status])}
+      </p>
+
+      <div className="flex gap-3 p-3">
         <PhotoFrame
           photo={booking.charter?.photo ?? null}
           rounded="rounded-lg"
@@ -254,12 +312,28 @@ function BookingRow({
                 <span className="line-clamp-1">{booking.charter?.title}</span>
               </Link>
             </h3>
-            <Badge tone={STATUS_TONE[booking.status]}>{t('bookings', STATUS_LABEL[booking.status])}</Badge>
           </div>
+
+          {role === 'owner' && counterparty ? (
+            <p className="mt-1 flex items-center gap-2">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-[10px] font-bold text-brand-800">
+                {counterparty.slice(0, 1)}
+              </span>
+              <span className="min-w-0 truncate text-sm font-semibold text-ink">{counterparty}</span>
+              <span className="shrink-0 text-xs text-ink-muted">
+                {t('bookings', 'guestSplit', {
+                  adults: booking.adults,
+                  children: booking.children,
+                })}
+              </span>
+            </p>
+          ) : null}
 
           <p className="mt-0.5 text-xs text-ink-muted">
             {t('bookings', 'reference', { code: booking.reference })}
-            {counterparty ? ` · ${t('bookings', 'withOwner', { owner: counterparty })}` : ''}
+            {role === 'customer' && counterparty
+              ? ` · ${t('bookings', 'withOwner', { owner: counterparty })}`
+              : ''}
           </p>
 
           <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
@@ -307,7 +381,7 @@ function BookingRow({
       </div>
 
       {/* ----------------------------------------------------- actions */}
-      <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
+      <div className="flex flex-wrap gap-2 border-t border-line p-3">
         <LinkButton href={detailHref} variant="outline" size="sm">
           {t('bookings', 'viewDetails')}
         </LinkButton>

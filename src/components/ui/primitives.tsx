@@ -17,11 +17,20 @@ import { cx } from './cx';
 
 // --- Button ----------------------------------------------------------------
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
+/**
+ * `accent` is the guest app's primary action.
+ *
+ * The real product uses blue chrome with an orange call to action on the
+ * customer side, and blue on both in the operator app — so "the primary
+ * button" is not one colour, and the two need separate names rather than one
+ * that means different things depending on where you are.
+ */
+type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'danger' | 'outline';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 disabled:bg-brand-300',
+  accent: 'bg-accent text-white hover:bg-accent-600 active:bg-accent-700 disabled:bg-accent-300',
   secondary: 'bg-ink text-white hover:bg-slate-800 active:bg-slate-900 disabled:bg-slate-400',
   outline: 'border border-line bg-white text-ink hover:bg-surface-sunken active:bg-slate-100 disabled:text-ink-faint',
   ghost: 'text-ink hover:bg-surface-sunken active:bg-slate-100 disabled:text-ink-faint',

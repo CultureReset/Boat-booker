@@ -16,17 +16,30 @@ import { AuthModal } from '@/components/auth/AuthModal';
  * Search result card.
  *
  * The single densest component in the product: it has to carry the photo,
- * price, capacity, rating, trust badges and the save control without becoming
- * unreadable on a 360px screen. Two layouts share this one implementation —
- * a vertical card in the results grid and a horizontal row for the map panel
- * and the wishlist.
+ * price, rating and the save control without becoming unreadable on a 360px
+ * screen.
+ *
+ * The default layout is deliberately **horizontal on phones and vertical from
+ * `sm` up**, which is how the real mobile app renders results: photo left at
+ * roughly 40%, everything else stacked to the right. A vertical card on a phone
+ * wastes the width and fits half as many results per screen.
+ *
+ * Two colour decisions are load-bearing rather than decorative, and both match
+ * the live product: the price is **green**, and instant confirmation is green
+ * text with a check rather than a coloured pill. Those are the two things a
+ * scanning eye looks for, and making them the only green on the card is what
+ * makes them findable.
  */
 
 export interface ListingCardProps {
   charter: CharterCard;
   /** Carried into the listing URL so the detail page opens on the same query. */
   searchParams?: string;
-  layout?: 'grid' | 'row';
+  /**
+   * `auto` is horizontal on phones, vertical from `sm` up. `row` forces the
+   * horizontal form (map panel, wishlist), `grid` forces the vertical one.
+   */
+  layout?: 'auto' | 'grid' | 'row';
   saved?: boolean;
   onToggleSaved?: (charterId: string, saved: boolean) => void;
   /** Position in the result set, announced to screen readers. */
@@ -38,7 +51,7 @@ export interface ListingCardProps {
 export function ListingCard({
   charter,
   searchParams,
-  layout = 'grid',
+  layout = 'auto',
   saved: savedProp,
   onToggleSaved,
   index,
@@ -53,6 +66,7 @@ export function ListingCard({
 
   const href = `/charters/view/${charter.id}${searchParams ? `?${searchParams}` : ''}`;
   const isRow = layout === 'row';
+  const isAuto = layout === 'auto';
 
   const toggleSave = async (event: React.MouseEvent) => {
     // The heart sits inside the card link, so stop it navigating.
@@ -93,6 +107,7 @@ export function ListingCard({
         className={cx(
           'group relative overflow-hidden rounded-card border border-line bg-white transition-shadow hover:shadow-card',
           isRow && 'flex gap-3 p-2',
+          isAuto && 'flex sm:block',
           !charter.available && 'opacity-70',
         )}
         aria-label={
@@ -113,10 +128,17 @@ export function ListingCard({
         <PhotoFrame
           photo={charter.photo}
           rounded={isRow ? 'rounded-lg' : 'rounded-none'}
-          className={cx(isRow ? 'h-24 w-28 shrink-0' : 'aspect-[4/3] w-full')}
+          className={cx(
+            isRow && 'h-24 w-28 shrink-0',
+            layout === 'grid' && 'aspect-[4/3] w-full',
+            // 40% of the card on a phone, full-bleed to the card edge; a
+            // normal aspect-ratio image from `sm` up.
+            isAuto && 'w-[40%] shrink-0 self-stretch sm:aspect-[4/3] sm:w-full',
+          )}
         >
-          {/* Badges are stacked over the photo, as on the live cards. */}
-          <div className="absolute left-2 top-2 z-20 flex flex-wrap gap-1">
+          {/* Badges stack over the photo, but only where there is room: the
+              phone card is deliberately clean, as the real one is. */}
+          <div className={cx('absolute left-2 top-2 z-20 flex-wrap gap-1', isAuto ? 'hidden sm:flex' : 'flex')}>
             {charter.hasBoatersChoiceAward ? (
               <Badge tone="gold" icon="star">{t('listingCard', 'boatersChoice')}</Badge>
             ) : null}
@@ -132,7 +154,14 @@ export function ListingCard({
             disabled={savePending}
             aria-pressed={saved}
             aria-label={saved ? t('listingCard', 'removeFromWishlist') : t('listingCard', 'addToWishlist')}
-            className="absolute right-2 top-2 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-ink shadow transition-transform hover:scale-105 active:scale-95"
+            className={cx(
+              'z-20 flex h-9 w-9 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95',
+              // On the phone card the heart sits on the card, not the photo —
+              // an outline heart over a photo is unreadable half the time.
+              isAuto
+                ? 'absolute right-1 top-1 text-ink-soft sm:right-2 sm:top-2 sm:bg-white/90 sm:text-ink sm:shadow'
+                : 'absolute right-2 top-2 bg-white/90 text-ink shadow',
+            )}
           >
             <Icon
               name={saved ? 'heart-filled' : 'heart'}
@@ -148,7 +177,14 @@ export function ListingCard({
           ) : null}
         </PhotoFrame>
 
-        <div className={cx('min-w-0', isRow ? 'flex-1 py-0.5' : 'p-3')}>
+        <div
+          className={cx(
+            'min-w-0',
+            isRow && 'flex-1 py-0.5',
+            layout === 'grid' && 'p-3',
+            isAuto && 'flex flex-1 flex-col p-3',
+          )}
+        >
           <div className="flex items-start justify-between gap-2">
             <h3 className={cx('min-w-0 font-bold text-ink', isRow ? 'text-sm' : 'text-[15px]')}>
               <span className="line-clamp-1">{charter.title}</span>
@@ -168,7 +204,12 @@ export function ListingCard({
             ) : null}
           </p>
 
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-soft">
+          <p
+            className={cx(
+              'mt-1.5 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-soft',
+              isAuto ? 'hidden sm:flex' : 'flex',
+            )}
+          >
             <span className="flex items-center gap-1">
               <Icon name="boat" size={12} />
               {charter.boatType}
@@ -193,10 +234,16 @@ export function ListingCard({
             </div>
           ) : null}
 
-          <div className="mt-2 flex flex-wrap gap-1">
-            {charter.isInstantBookActive ? (
-              <Badge tone="brand" icon="bolt">{t('listingCard', 'instantBook')}</Badge>
-            ) : null}
+          {/* Instant confirmation reads as green text with a check, not as a
+              pill: it is a reassurance, not a category. */}
+          {charter.isInstantBookActive ? (
+            <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-success">
+              <Icon name="check" size={13} strokeWidth={2.6} />
+              {t('listingCard', 'instantConfirmation')}
+            </p>
+          ) : null}
+
+          <div className={cx('mt-2 flex-wrap gap-1', isAuto ? 'hidden sm:flex' : 'flex')}>
             {charter.freeCancellationDaysInAdvance > 0 ? (
               <Badge tone="success" icon="check">{t('listingCard', 'freeCancellation')}</Badge>
             ) : null}
@@ -208,10 +255,21 @@ export function ListingCard({
           </div>
 
           {charter.minPrice ? (
-            <div className="mt-2.5 flex items-baseline justify-between gap-2 border-t border-line pt-2.5">
+            <div
+              className={cx(
+                'flex items-baseline justify-between gap-2',
+                // On the phone card the price hugs the bottom of the row
+                // rather than sitting under a divider.
+                isAuto
+                  ? 'mt-auto pt-2 sm:mt-2.5 sm:border-t sm:border-line sm:pt-2.5'
+                  : 'mt-2.5 border-t border-line pt-2.5',
+              )}
+            >
               <span className="text-xs text-ink-muted">{t('listingCard', 'tripsFrom')}</span>
               <span className="text-right">
-                <span className="text-base font-extrabold text-ink">{charter.minPrice.displayValue}</span>
+                <span className="text-base font-extrabold text-success">
+                  {charter.minPrice.displayValue}
+                </span>
                 {priceLabel ? <span className="ml-1 text-xs text-ink-muted">{priceLabel}</span> : null}
               </span>
             </div>
@@ -231,8 +289,8 @@ export function ListingCard({
   );
 }
 
-export function ListingCardSkeleton({ layout = 'grid' }: { layout?: 'grid' | 'row' }) {
-  const isRow = layout === 'row';
+export function ListingCardSkeleton({ layout = 'auto' }: { layout?: 'auto' | 'grid' | 'row' }) {
+  const isRow = layout === 'row' || layout === 'auto';
   return (
     <div
       className={cx('overflow-hidden rounded-card border border-line bg-white', isRow && 'flex gap-3 p-2')}

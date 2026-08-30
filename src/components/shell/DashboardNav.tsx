@@ -7,12 +7,17 @@ import { Badge } from '@/components/ui/primitives';
 import { cx } from '@/components/ui/cx';
 
 /**
- * Dashboard navigation.
+ * Dashboard navigation — the desktop sidebar rail.
  *
- * A vertical rail on desktop, and a horizontally scrolling chip row on mobile
- * where a sidebar would eat half the screen. The same item list feeds both, so
- * the two can never drift apart. The bottom tab bar handles the top-level
- * jumps on mobile; this handles movement within a section.
+ * Deliberately absent on mobile. It used to render there as a horizontally
+ * scrolling chip row, which put a second copy of Bookings / Inbox / Calendar
+ * directly above a bottom tab bar that already had them: two navigations
+ * competing for the same taps, and a wasted 60px on every screen.
+ *
+ * On mobile the split is the app's: the tab bar carries the five working
+ * destinations, and everything else hangs off the Menu screen (`/owner/menu`,
+ * `/account/menu`). Anything added here must also appear in one of those two,
+ * or it becomes unreachable on a phone.
  */
 
 export interface DashboardNavItem {
@@ -37,66 +42,30 @@ export function DashboardNav({ items, title }: { items: DashboardNavItem[]; titl
   };
 
   return (
-    <>
-      {/* --------------------------------------------------- desktop */}
-      <nav aria-label={title} className="hidden w-56 shrink-0 md:block">
-        <div className="sticky top-20">
-          <h2 className="mb-2 px-3 text-xs font-bold uppercase tracking-wide text-ink-faint">{title}</h2>
-          <ul className="space-y-0.5">
-            {items.map((item) => (
-              <li key={item.href} className={item.groupStart ? 'mt-3 border-t border-line pt-3' : undefined}>
-                <Link
-                  href={item.href}
-                  aria-current={isActive(item) ? 'page' : undefined}
-                  className={cx(
-                    'flex items-center gap-2.5 rounded-control px-3 py-2 text-sm transition-colors',
-                    isActive(item)
-                      ? 'bg-brand-50 font-bold text-brand-800'
-                      : 'font-medium text-ink-soft hover:bg-surface-sunken hover:text-ink',
-                  )}
-                >
-                  <Icon name={item.icon} size={17} />
-                  <span className="flex-1 truncate">{item.label}</span>
-                  {item.badge && item.badge > 0 ? <Badge tone="brand">{item.badge}</Badge> : null}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </nav>
-
-      {/* ---------------------------------------------------- mobile */}
-      <nav aria-label={title} className="-mx-4 mb-4 md:hidden">
-        <ul className="rail px-4">
+    <nav aria-label={title} className="hidden w-56 shrink-0 md:block">
+      <div className="sticky top-20">
+        <h2 className="mb-2 px-3 text-xs font-bold uppercase tracking-wide text-ink-faint">{title}</h2>
+        <ul className="space-y-0.5">
           {items.map((item) => (
-            <li key={item.href} className="shrink-0">
+            <li key={item.href} className={item.groupStart ? 'mt-3 border-t border-line pt-3' : undefined}>
               <Link
                 href={item.href}
                 aria-current={isActive(item) ? 'page' : undefined}
                 className={cx(
-                  'flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm transition-colors',
+                  'flex items-center gap-2.5 rounded-control px-3 py-2 text-sm transition-colors',
                   isActive(item)
-                    ? 'bg-ink font-bold text-white'
-                    : 'border border-line bg-white font-medium text-ink-soft',
+                    ? 'bg-brand-50 font-bold text-brand-800'
+                    : 'font-medium text-ink-soft hover:bg-surface-sunken hover:text-ink',
                 )}
               >
-                <Icon name={item.icon} size={15} />
-                {item.label}
-                {item.badge && item.badge > 0 ? (
-                  <span
-                    className={cx(
-                      'ml-0.5 rounded-full px-1.5 text-[10px] font-bold',
-                      isActive(item) ? 'bg-white/20 text-white' : 'bg-brand-100 text-brand-800',
-                    )}
-                  >
-                    {item.badge}
-                  </span>
-                ) : null}
+                <Icon name={item.icon} size={17} />
+                <span className="flex-1 truncate">{item.label}</span>
+                {item.badge && item.badge > 0 ? <Badge tone="brand">{item.badge}</Badge> : null}
               </Link>
             </li>
           ))}
         </ul>
-      </nav>
-    </>
+      </div>
+    </nav>
   );
 }

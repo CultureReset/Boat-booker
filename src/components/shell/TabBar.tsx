@@ -27,6 +27,18 @@ interface Tab {
   label: string;
   /** Matching prefix for the active state; falls back to `href`. */
   match?: string;
+  /**
+   * Only the exact path counts as active. Section roots need this: `/owner` is
+   * a prefix of every other owner route, so a prefix match would light Home on
+   * every screen in the app.
+   */
+  exact?: boolean;
+  /**
+   * Claims anything under `section` that no other tab matched — how the Menu
+   * tab stays lit on the screens it pushes, now that those screens have no
+   * navigation of their own on mobile.
+   */
+  section?: string;
   badge?: number;
   requiresAuth?: boolean;
 }
@@ -48,14 +60,20 @@ export function TabBar() {
 
   const tabs: Tab[] = isOwner
     ? [
-        { key: 'home', href: '/owner', icon: 'chart', label: t('navigation', 'dashboard') },
+        { key: 'home', href: '/owner', icon: 'home', label: t('navigation', 'home'), exact: true },
         { key: 'calendar', href: '/owner/calendar', icon: 'calendar', label: t('navigation', 'manageCalendar') },
         { key: 'bookings', href: '/owner/bookings', icon: 'tag', label: t('navigation', 'bookings') },
         { key: 'inbox', href: '/owner/inbox', icon: 'message', label: t('navigation', 'inbox'), badge: unreadMessages },
-        { key: 'more', href: '/owner/settings', icon: 'menu', label: t('navigation', 'more') },
+        {
+          key: 'menu',
+          href: '/owner/menu',
+          icon: 'menu',
+          label: t('navigation', 'menu'),
+          section: '/owner',
+        },
       ]
     : [
-        { key: 'home', href: '/', icon: 'search', label: t('navigation', 'home'), match: '/' },
+        { key: 'home', href: '/', icon: 'search', label: t('navigation', 'home'), exact: true },
         {
           key: 'wishlist',
           href: '/account/wishlist',
@@ -81,17 +99,29 @@ export function TabBar() {
         },
         {
           key: 'account',
-          href: user ? '/account/profile' : '/login',
+          href: user ? '/account/menu' : '/login',
           icon: 'user',
           label: user ? t('navigation', 'profile') : t('login', 'login'),
+          section: user ? '/account' : undefined,
           requiresAuth: false,
         },
       ];
 
-  const isActive = (tab: Tab) => {
+  const matches = (tab: Tab) => {
     const target = tab.match ?? tab.href;
-    return target === '/' ? pathname === '/' : pathname.startsWith(target);
+    if (tab.exact) return pathname === target;
+    return pathname === target || pathname.startsWith(`${target}/`);
   };
+
+  // Resolved once rather than per tab: a section tab is active only when no
+  // more specific tab claimed the path, so /account/bookings lights Bookings
+  // and /account/loyalty falls through to Profile.
+  const claimed = tabs.find(matches);
+  const active =
+    claimed ??
+    tabs.find((tab) => tab.section && (pathname === tab.section || pathname.startsWith(`${tab.section}/`)));
+
+  const isActive = (tab: Tab) => tab.key === active?.key;
 
   return (
     <>

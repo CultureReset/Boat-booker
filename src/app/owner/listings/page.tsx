@@ -14,8 +14,11 @@ export const metadata: Metadata = { title: t('owner', 'listingsTitle') };
 /**
  * Owner listing index.
  *
- * Each row leads with the completeness meter, because an incomplete listing is
- * the single biggest thing holding back an operator's bookings.
+ * Two densities, chosen by viewport. On a phone this is deliberately minimal —
+ * a status strip, the boat, and one row that says "Edit listing" — because the
+ * operator app's listings tab is a way *in*, not a dashboard; the metrics live
+ * under Performance where there is room to read them. From `sm` up, where the
+ * numbers fit without crowding, the fuller card returns.
  */
 export default async function OwnerListingsPage() {
   const user = (await currentUser())!;
@@ -45,21 +48,31 @@ export default async function OwnerListingsPage() {
         <ul className="space-y-3">
           {listings.map((listing) => (
             <li key={listing.id}>
-              <article className="rounded-card border border-line bg-white p-3 shadow-card">
-                <div className="flex gap-3">
+              <article className="overflow-hidden rounded-card border border-line bg-white shadow-card">
+                {/* Status as a header strip, matching the bookings cards. */}
+                <p
+                  className={cx(
+                    'px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide',
+                    listing.published
+                      ? 'bg-emerald-50 text-emerald-800'
+                      : 'bg-surface-sunken text-ink-soft',
+                  )}
+                >
+                  {listing.published ? t('owner', 'published') : t('owner', 'draft')}
+                </p>
+
+                <div className="flex gap-3 p-3">
                   <PhotoFrame photo={listing.photo} rounded="rounded-lg" className="h-20 w-24 shrink-0" />
 
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <h2 className="min-w-0 text-sm font-bold text-ink">
-                        <Link href={`/owner/listings/${listing.id}`} className="hover:underline">
-                          <span className="line-clamp-1">{listing.title}</span>
-                        </Link>
-                      </h2>
-                      <Badge tone={listing.published ? 'success' : 'neutral'}>
-                        {listing.published ? t('owner', 'published') : t('owner', 'draft')}
-                      </Badge>
-                    </div>
+                    <h2 className="flex min-w-0 items-center gap-1.5 text-sm font-bold text-ink">
+                      <Link href={`/owner/listings/${listing.id}`} className="min-w-0 hover:underline">
+                        <span className="line-clamp-1">{listing.title}</span>
+                      </Link>
+                      {listing.verificationBadge ? (
+                        <Icon name="shield" size={14} className="shrink-0 text-success" />
+                      ) : null}
+                    </h2>
 
                     <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
                       <span className="flex items-center gap-1">
@@ -77,7 +90,7 @@ export default async function OwnerListingsPage() {
                     </p>
 
                     {listing.reviewStatistics.reviewCount > 0 ? (
-                      <div className="mt-1">
+                      <div className="mt-1 hidden sm:block">
                         <RatingSummary
                           rating={listing.reviewStatistics.rating}
                           count={listing.reviewStatistics.reviewCount}
@@ -86,7 +99,7 @@ export default async function OwnerListingsPage() {
                       </div>
                     ) : null}
 
-                    <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                    <dl className="mt-2 hidden flex-wrap gap-x-4 gap-y-1 text-xs sm:flex">
                       <Metric label={t('navigation', 'bookings')} value={listing.upcomingBookings} />
                       <Metric label={t('owner', 'statsPendingRequests')} value={listing.pendingBookings} />
                       <Metric label={t('owner', 'stepTrips')} value={listing.packageCount} />
@@ -95,8 +108,9 @@ export default async function OwnerListingsPage() {
                   </div>
                 </div>
 
-                {/* Completeness meter */}
-                <div className="mt-3 border-t border-line pt-3">
+                {/* Completeness meter — desktop only; on a phone the
+                    opportunities screen carries this job properly. */}
+                <div className="hidden border-t border-line p-3 sm:block">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-semibold text-ink">
                       {t('owner', 'listingCompleteness')}
@@ -121,22 +135,30 @@ export default async function OwnerListingsPage() {
                   </div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
-                    href={`/owner/listings/${listing.id}`}
-                    className="flex h-9 items-center gap-1.5 rounded-control border border-line px-3 text-sm font-semibold text-ink transition-colors hover:bg-surface-sunken"
-                  >
-                    <Icon name="edit" size={15} />
-                    {t('owner', 'editListing')}
-                  </Link>
-                  <Link
-                    href={`/charters/view/${listing.id}`}
-                    className="flex h-9 items-center gap-1.5 rounded-control px-3 text-sm font-semibold text-ink-soft transition-colors hover:bg-surface-sunken"
-                  >
-                    <Icon name="external" size={15} />
-                    {t('search', 'listView')}
-                  </Link>
-                </div>
+                {/* The whole row is the affordance on a phone, as it is in
+                    the real app: a title, a subtitle and a chevron. */}
+                <Link
+                  href={`/owner/listings/${listing.id}`}
+                  className="flex items-center gap-3 border-t border-line p-3 transition-colors hover:bg-surface-sunken"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold text-ink">
+                      {t('owner', 'editListing')}
+                    </span>
+                    <span className="block text-xs text-ink-muted">
+                      {t('owner', 'editListingHint')}
+                    </span>
+                  </span>
+                  <Icon name="chevron-right" size={16} className="shrink-0 text-ink-faint" />
+                </Link>
+
+                <Link
+                  href={`/charters/view/${listing.id}`}
+                  className="hidden items-center gap-1.5 border-t border-line px-3 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-surface-sunken sm:flex"
+                >
+                  <Icon name="external" size={15} />
+                  {t('search', 'listView')}
+                </Link>
               </article>
             </li>
           ))}

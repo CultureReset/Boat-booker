@@ -29,10 +29,16 @@ export default async function OwnerListingPage({ params }: { params: Promise<{ i
 
   return (
     <>
+      <ListingEditor listing={listing} destinations={destinations} />
+
       {/* Itineraries and extras are separate screens rather than editor steps:
           they are per-trip, and threading them through a listing-wide wizard
-          would make the wizard about the wrong unit. */}
-      <div className="mb-4 grid gap-2 sm:grid-cols-2">
+          would make the wizard about the wrong unit.
+
+          They sit after the editor, not before it: the editor opens with the
+          back link and the listing's name, and pushing those below two
+          unrelated cards leaves the screen with no header at the top. */}
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
         <Link
           href={`/owner/listings/${id}/itineraries`}
           className="flex items-center gap-3 rounded-card border border-line bg-white p-3 transition-colors hover:bg-surface-sunken"
@@ -59,8 +65,6 @@ export default async function OwnerListingPage({ params }: { params: Promise<{ i
           </span>
         </Link>
       </div>
-
-      <ListingEditor listing={listing} destinations={destinations} />
     </>
   );
 }

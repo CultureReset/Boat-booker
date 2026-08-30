@@ -317,8 +317,7 @@ export function MultiCalendar({ rows: initialRows }: { rows: CalendarRow[] }) {
       </div>
 
       <p className="mt-2 text-xs text-ink-muted">
-        Tap a day to select it, shift-click to select a range, then block or open the selection.
-        Booked days cannot be edited here — cancel the booking first.
+        {t('owner', 'calendarHelp')}
       </p>
     </div>
   );

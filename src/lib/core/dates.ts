@@ -107,15 +107,34 @@ export function timeAgo(iso: string, now = Date.now()): string {
   return `${years} ${years === 1 ? 'year' : 'years'}`;
 }
 
-/** Calendar grid for a month, padded to whole Monday-start weeks. */
-export function monthGrid(year: number, month: number): (IsoDate | null)[] {
+/**
+ * Calendar grid for a month, padded to whole weeks.
+ *
+ * `weekStart` matters: the operator app starts the week on Sunday, which is
+ * what US operators expect, while the guest-facing pickers start on Monday.
+ * Hardcoding either one puts half the product's calendars a day out.
+ */
+export function monthGrid(
+  year: number,
+  month: number,
+  weekStart: 'monday' | 'sunday' = 'monday',
+): (IsoDate | null)[] {
   const first = new Date(Date.UTC(year, month, 1));
   const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const leading = (first.getUTCDay() + 6) % 7; // shift so Monday = 0
+
+  const leading =
+    weekStart === 'sunday' ? first.getUTCDay() : (first.getUTCDay() + 6) % 7;
+
   const cells: (IsoDate | null)[] = Array(leading).fill(null);
   for (let d = 1; d <= daysInMonth; d += 1) {
     cells.push(toIsoDate(new Date(Date.UTC(year, month, d))));
   }
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
+}
+
+/** Column headers matching a `monthGrid` week start. */
+export function weekdayHeadings(weekStart: 'monday' | 'sunday' = 'monday'): string[] {
+  const short = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  return weekStart === 'sunday' ? short : [...short.slice(1), short[0]];
 }

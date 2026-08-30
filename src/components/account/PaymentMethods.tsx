@@ -248,7 +248,7 @@ function AddCardDialog({
 
         <p className="flex items-start gap-1.5 text-xs text-ink-muted">
           <Icon name="lock" size={13} className="mt-0.5 shrink-0" />
-          Only the brand and last four digits are stored.
+          {t('account', 'cardStorageNote')}
         </p>
       </div>
     </Overlay>

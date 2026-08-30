@@ -238,7 +238,11 @@ export function ThreadView({
   };
 
   return (
-    <div className="flex h-[calc(100dvh-8rem)] flex-col rounded-card border border-line bg-white">
+    // Full-bleed on a phone: the negative margins cancel the dashboard shell's
+    // padding so the thread owns the screen the way the app's does, with the
+    // composer against the bottom edge instead of floating above a gutter. From
+    // `md` up it goes back to being a card inside the two-column layout.
+    <div className="-mx-4 -my-5 flex h-[calc(100dvh-var(--header-height,56px))] flex-col border-line bg-white md:mx-0 md:my-0 md:h-[calc(100dvh-8rem)] md:rounded-card md:border">
       <ThreadHeader
         thread={thread}
         basePath={basePath}

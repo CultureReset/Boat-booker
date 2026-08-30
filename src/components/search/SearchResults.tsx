@@ -12,7 +12,7 @@ import type { CharterCard } from '@/lib/services/charters';
 import type { FacetGroup, SortKey } from '@/lib/services/search';
 import { Icon } from '@/components/ui/Icon';
 import { Overlay } from '@/components/ui/Overlay';
-import { Badge, Button, EmptyState, Select } from '@/components/ui/primitives';
+import { Badge, Button, EmptyState, Radio, Select } from '@/components/ui/primitives';
 import { cx } from '@/components/ui/cx';
 import { ListingCard, ListingCardSkeleton } from '@/components/listing/ListingCard';
 import { SearchWidget, type SearchValues } from './SearchWidget';
@@ -66,6 +66,7 @@ export function SearchResults() {
   const [error, setError] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
 
   const requestId = useRef(0);
@@ -250,42 +251,80 @@ export function SearchResults() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setFiltersOpen(true)}
-            className="flex h-10 items-center gap-1.5 rounded-control border border-line px-3 text-sm font-semibold text-ink transition-colors hover:bg-surface-sunken lg:hidden"
+        {/* Desktop keeps a sort dropdown beside the heading; the phone gets
+            the three-up toolbar below, which is what the real app uses. */}
+        <label className="hidden items-center gap-2 sm:flex">
+          <span className="text-sm text-ink-muted">{t('search', 'sortBy')}</span>
+          <Select
+            value={query.sort}
+            onChange={(e) => updateUrl((params) => params.set('sort', e.target.value))}
+            className="h-10 w-44"
           >
-            <Icon name="filter" size={16} />
-            {t('search', 'filters')}
-            {activeFilterCount > 0 ? <Badge tone="brand">{activeFilterCount}</Badge> : null}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMapOpen(true)}
-            className="flex h-10 items-center gap-1.5 rounded-control border border-line px-3 text-sm font-semibold text-ink transition-colors hover:bg-surface-sunken lg:hidden"
-          >
-            <Icon name="map" size={16} />
-            {t('search', 'map')}
-          </button>
-
-          <label className="hidden items-center gap-2 sm:flex">
-            <span className="text-sm text-ink-muted">{t('search', 'sortBy')}</span>
-            <Select
-              value={query.sort}
-              onChange={(e) => updateUrl((params) => params.set('sort', e.target.value))}
-              className="h-10 w-44"
-            >
-              {SORT_OPTIONS.filter((option) => option.key !== 'distance' || query.lat).map((option) => (
-                <option key={option.key} value={option.key}>
-                  {t('search', option.labelKey)}
-                </option>
-              ))}
-            </Select>
-          </label>
-        </div>
+            {SORT_OPTIONS.filter((option) => option.key !== 'distance' || query.lat).map((option) => (
+              <option key={option.key} value={option.key}>
+                {t('search', option.labelKey)}
+              </option>
+            ))}
+          </Select>
+        </label>
       </div>
+
+      {/*
+        Filter · Sort · Map — three equal segments, sticky under the header.
+        Equal thirds rather than sized-to-content because they are peers: none
+        of the three is the primary action, and a wide "Filter" beside a narrow
+        "Map" implies otherwise.
+      */}
+      <div className="sticky top-[var(--header-height,56px)] z-20 -mx-4 mb-4 grid grid-cols-3 border-y border-line bg-white sm:hidden">
+        <button
+          type="button"
+          onClick={() => setFiltersOpen(true)}
+          className="flex h-12 items-center justify-center gap-1.5 text-sm font-semibold text-ink transition-colors active:bg-surface-sunken"
+        >
+          <Icon name="filter" size={16} />
+          {t('search', 'filters')}
+          {activeFilterCount > 0 ? (
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1 text-[11px] font-bold text-white">
+              {activeFilterCount}
+            </span>
+          ) : null}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSortOpen(true)}
+          className="flex h-12 items-center justify-center gap-1.5 border-x border-line text-sm font-semibold text-ink transition-colors active:bg-surface-sunken"
+        >
+          <Icon name="sort" size={16} />
+          {t('search', 'sortBy')}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMapOpen(true)}
+          className="flex h-12 items-center justify-center gap-1.5 text-sm font-semibold text-ink transition-colors active:bg-surface-sunken"
+        >
+          <Icon name="map" size={16} />
+          {t('search', 'map')}
+        </button>
+      </div>
+
+      <Overlay open={sortOpen} onClose={() => setSortOpen(false)} title={t('search', 'sortBy')}>
+        <div className="space-y-1">
+          {SORT_OPTIONS.filter((option) => option.key !== 'distance' || query.lat).map((option) => (
+            <Radio
+              key={option.key}
+              name="sort"
+              label={t('search', option.labelKey)}
+              checked={query.sort === option.key}
+              onChange={() => {
+                updateUrl((params) => params.set('sort', option.key));
+                setSortOpen(false);
+              }}
+            />
+          ))}
+        </div>
+      </Overlay>
 
       {/* Active filter chips */}
       {activeFilterCount > 0 ? (

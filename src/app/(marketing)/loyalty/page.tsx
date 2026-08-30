@@ -25,8 +25,8 @@ export default function LoyaltyPage() {
       </nav>
 
       <SectionHeading
-        title={`${brand.name} Loyalty`}
-        subtitle="Every completed trip moves you up. Discounts apply automatically at checkout."
+        title={t('account', 'loyaltyPageTitle')}
+        subtitle={t('account', 'loyaltyPageSubtitle')}
         level={1}
       />
 

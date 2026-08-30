@@ -145,7 +145,7 @@ export function OwnerReviewList({ reviews: initial }: { reviews: ExpandedReview[
           maxLength={2000}
         />
         <p className="mt-2 text-xs text-ink-muted">
-          Your response is published publicly beneath the review.
+          {t('owner', 'responsePublicNote')}
         </p>
       </Overlay>
     </>

@@ -140,7 +140,7 @@ export function VerificationPanel({ verification: initial }: { verification: Ver
               )}
             </Field>
 
-            <Field label="File name" required>
+            <Field label={t('owner', 'documentFileName')} required>
               {({ id }) => (
                 <Input
                   id={id}

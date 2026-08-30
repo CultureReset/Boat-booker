@@ -55,7 +55,7 @@ export function PayoutMethods({
         <EmptyState
           icon="wallet"
           title={t('owner', 'addPayoutMethod')}
-          body="Add a bank account or PayPal address so we can send your earnings."
+          body={t('owner', 'payoutMethodsEmptyBody')}
           action={<Button icon="plus" onClick={() => setAddOpen(true)}>{t('owner', 'addPayoutMethod')}</Button>}
         />
       ) : (
@@ -210,7 +210,7 @@ function AddMethodDialog({
           </div>
         </fieldset>
 
-        <Field label={t('general', 'optional')} hint="A name you will recognise, e.g. Business checking.">
+        <Field label={t('owner', 'payoutLabelName')} hint={t('owner', 'payoutLabelHint')}>
           {({ id }) => <Input id={id} value={label} onChange={(e) => setLabel(e.target.value)} />}
         </Field>
 
@@ -248,7 +248,7 @@ function AddMethodDialog({
 
         <p className="flex items-start gap-1.5 text-xs text-ink-muted">
           <Icon name="lock" size={13} className="mt-0.5 shrink-0" />
-          Only the last four characters are stored.
+          {t('owner', 'payoutStorageNote')}
         </p>
       </div>
     </Overlay>

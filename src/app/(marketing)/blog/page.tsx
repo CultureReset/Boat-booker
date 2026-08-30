@@ -55,7 +55,7 @@ export default async function BlogPage() {
 
       <SectionHeading
         title={t('navigation', 'blog')}
-        subtitle="Destination notes, written from what operators tell us."
+        subtitle={t('navigation', 'blogSubtitle')}
         level={1}
       />
 

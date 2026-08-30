@@ -257,6 +257,8 @@ export function listOwnerCharters(db: Database, ownerId: string) {
         upcomingBookings: bookings.filter((b) => b.status === 'confirmed' && b.date >= today()).length,
         pendingBookings: bookings.filter((b) => b.status === 'pending').length,
         viewsLast7Days: charter.viewsLast7Days,
+        // The green shield beside a listing's name in the operator app.
+        verificationBadge: charter.verificationBadge,
         completeness: listingCompleteness(charter, packages.length),
         currency: charter.currency,
         boatType: charter.boat.type,

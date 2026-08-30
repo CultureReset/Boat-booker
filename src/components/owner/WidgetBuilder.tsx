@@ -74,7 +74,7 @@ export function WidgetBuilder({
       <EmptyState
         icon="grid"
         title={t('owner', 'listingsEmpty')}
-        body="Publish a listing before generating an embed."
+        body={t('owner', 'widgetsNeedListing')}
         action={<LinkButton href="/owner/listings">{t('navigation', 'listings')}</LinkButton>}
       />
     );
@@ -95,12 +95,12 @@ export function WidgetBuilder({
           )}
         </Field>
 
-        <Field label={t('owner', 'widgetsTitle')}>
+        <Field label={t('owner', 'widgetKind')}>
           {({ id }) => (
             <Select id={id} value={kind} onChange={(e) => setKind(e.target.value as WidgetKind)}>
-              <option value="booking">Booking form</option>
-              <option value="button">Check availability button</option>
-              <option value="reviews">Review badge</option>
+              <option value="booking">{t('owner', 'widgetBookingForm')}</option>
+              <option value="button">{t('owner', 'widgetAvailabilityButton')}</option>
+              <option value="reviews">{t('owner', 'widgetReviewBadge')}</option>
             </Select>
           )}
         </Field>
@@ -108,16 +108,17 @@ export function WidgetBuilder({
 
       {/* Preview */}
       <section className="rounded-card border border-line bg-white p-4">
-        <h2 className="mb-3 text-sm font-bold text-ink">{t('general', 'seeMore')}</h2>
+        <h2 className="mb-3 text-sm font-bold text-ink">{t('owner', 'widgetPreview')}</h2>
         <div className="flex min-h-[80px] items-center justify-center rounded-control border border-dashed border-line bg-surface-sunken p-4">
           {kind === 'button' ? (
             <span className="inline-flex h-11 items-center gap-2 rounded-control bg-brand-600 px-5 text-sm font-semibold text-white">
               <Icon name="calendar" size={16} />
-              Check availability
+              {t('owner', 'widgetCheckAvailability')}
             </span>
           ) : (
             <span className="text-sm text-ink-muted">
-              {kind === 'reviews' ? 'Review badge' : 'Booking form'} · {listings.find((l) => l.id === listingId)?.title}
+              {kind === 'reviews' ? t('owner', 'widgetReviewBadge') : t('owner', 'widgetBookingForm')} ·{' '}
+              {listings.find((l) => l.id === listingId)?.title}
             </span>
           )}
         </div>
@@ -138,9 +139,7 @@ export function WidgetBuilder({
         >
           <code>{snippet}</code>
         </pre>
-        <p className="mt-2 text-xs text-ink-muted">
-          Paste this into your own site. Bookings made through it appear in your dashboard like any other.
-        </p>
+        <p className="mt-2 text-xs text-ink-muted">{t('owner', 'embedCodeHint')}</p>
       </section>
     </div>
   );

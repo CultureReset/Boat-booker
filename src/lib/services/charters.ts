@@ -6,6 +6,7 @@ import {
   verificationBadges,
   type AmenityGroup,
 } from '@/config/taxonomy';
+import { addDays, today } from '@/lib/core/dates';
 import { money } from '@/lib/core/money';
 import type {
   AddOn,
@@ -260,6 +261,15 @@ export interface CharterDetail extends Omit<CharterCard, 'photo'> {
   })[];
   /** Paid extras a guest can add at checkout. */
   addOns: AddOn[];
+  /**
+   * Real bookings in the past week, or null.
+   *
+   * Counted rather than estimated: a scarcity claim that is not literally true
+   * is the kind of dark pattern that erodes the trust the rest of the product
+   * is built on. Null below the threshold, so the UI has nothing to render
+   * rather than something to soften.
+   */
+  scarcity: { bookingsLastWeek: number } | null;
   owner: {
     id: string;
     displayName: string;
@@ -352,6 +362,17 @@ export function buildCharterDetail(input: {
       };
     }),
     addOns: db.addOns.filter((a) => a.charterId === charter.id && a.active),
+    scarcity: (() => {
+      const cutoff = addDays(today(), -7);
+      const recent = db.bookings.filter(
+        (b) =>
+          b.charterId === charter.id &&
+          b.createdAt.slice(0, 10) >= cutoff &&
+          b.status !== 'declined' &&
+          b.status !== 'withdrawn',
+      ).length;
+      return recent >= 3 ? { bookingsLastWeek: recent } : null;
+    })(),
     owner: {
       id: charter.ownerId,
       displayName: owner?.ownerProfile?.captainName ?? `${owner?.firstName ?? ''} ${owner?.lastName ?? ''}`.trim(),
@@ -401,6 +422,8 @@ export function ownerListingSummary(db: Database, charter: Charter) {
     upcomingBookings: bookings.filter((b) => b.status === 'confirmed' && b.date >= new Date().toISOString().slice(0, 10)).length,
     pendingBookings: bookings.filter((b) => b.status === 'pending').length,
     viewsLast7Days: charter.viewsLast7Days,
+    // The green shield beside a listing's name in the operator app.
+    verificationBadge: charter.verificationBadge,
     completeness: listingCompleteness(charter, packages.length),
     currency: charter.currency,
   };

@@ -37,9 +37,7 @@ export default async function PayoutsPage() {
           <Icon name="alert" size={18} className="mt-0.5 shrink-0 text-danger" />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-ink">{t('owner', 'addPayoutMethod')}</p>
-            <p className="mt-0.5 text-sm text-ink-muted">
-              We cannot send your earnings until a payout method is on file.
-            </p>
+            <p className="mt-0.5 text-sm text-ink-muted">{t('owner', 'addPayoutMethodBody')}</p>
           </div>
           <LinkButton href="/owner/payout-methods" size="sm" className="shrink-0">
             {t('owner', 'addPayoutMethod')}
@@ -67,7 +65,48 @@ export default async function PayoutsPage() {
       {ledger.rows.length === 0 ? (
         <EmptyState icon="wallet" title={t('owner', 'payoutsEmpty')} />
       ) : (
-        <div className="overflow-x-auto rounded-card border border-line bg-white">
+        <>
+        {/*
+          One ledger, two shapes. Seven columns cannot be read on a 412px
+          screen — horizontal scrolling hides the money, which is the one thing
+          an operator opened this screen for — so the phone gets a card per
+          booking with the net payout as the headline, and the table stays for
+          the width that can hold it.
+        */}
+        <ul className="space-y-2 md:hidden">
+          {ledger.rows.map((row) => (
+            <li key={row.id} className="rounded-card border border-line bg-white p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-ink">{row.charterTitle}</p>
+                  <p className="mt-0.5 font-mono text-xs text-ink-muted">{row.reference}</p>
+                </div>
+                <Badge tone={row.status === 'paid' ? 'success' : 'neutral'}>
+                  {row.status === 'paid' ? t('owner', 'payoutsPaid') : t('owner', 'payoutsPending')}
+                </Badge>
+              </div>
+
+              <dl className="mt-2 space-y-1 border-t border-line pt-2 text-sm">
+                <Line label={t('booking', 'tripDate')}>
+                  {row.tripDate ? formatDate(row.tripDate, 'medium') : '—'}
+                </Line>
+                <Line label={t('owner', 'grossEarnings')}>{formatMoney(row.gross, row.currency)}</Line>
+                <Line
+                  label={t('owner', 'platformFee', {
+                    percent: Math.round(commerceConfig.serviceFeeRate * 100),
+                  })}
+                >
+                  − {formatMoney(row.platformFee, row.currency)}
+                </Line>
+                <Line label={t('owner', 'netPayout')} strong>
+                  {formatMoney(row.net, row.currency)}
+                </Line>
+              </dl>
+            </li>
+          ))}
+        </ul>
+
+        <div className="hidden overflow-x-auto rounded-card border border-line bg-white md:block">
           <table className="w-full border-collapse text-sm">
             <caption className="sr-only">{t('owner', 'payoutsTitle')}</caption>
             <thead>
@@ -108,8 +147,29 @@ export default async function PayoutsPage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </>
+  );
+}
+
+/** One label/value pair inside a payout card. */
+function Line({
+  label,
+  strong,
+  children,
+}: {
+  label: string;
+  strong?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-ink-muted">{label}</dt>
+      <dd className={strong ? 'font-bold tabular-nums text-ink' : 'tabular-nums text-ink'}>
+        {children}
+      </dd>
+    </div>
   );
 }
 

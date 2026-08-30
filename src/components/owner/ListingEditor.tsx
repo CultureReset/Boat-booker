@@ -262,7 +262,7 @@ function BasicsStep({
         {({ id }) => <Input id={id} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={140} />}
       </Field>
 
-      <Field label={t('search', 'sortRecommended')} hint="One line shown on search cards.">
+      <Field label={t('owner', 'listingSummaryLabel')} hint={t('owner', 'listingSummaryHint')}>
         {({ id }) => (
           <Input
             id={id}
@@ -677,13 +677,13 @@ function PhotosStep({
       )}
 
       <div className="rounded-control border border-line p-3">
-        <Field label={t('owner', 'addPhoto')} hint="Describe the photo for screen readers and SEO.">
+        <Field label={t('owner', 'addPhoto')} hint={t('owner', 'photoAltHint')}>
           {({ id }) => (
             <Input
               id={id}
               value={altText}
               onChange={(e) => setAltText(e.target.value)}
-              placeholder="Sunset view from the bow"
+              placeholder={t('owner', 'photoAltPlaceholder')}
             />
           )}
         </Field>
@@ -691,7 +691,7 @@ function PhotosStep({
           {t('owner', 'addPhoto')}
         </Button>
         <p className="mt-2 text-xs text-ink-muted">
-          This build generates a placeholder image; connecting object storage replaces it with an upload.
+          {t('owner', 'photoUploadNote')}
         </p>
       </div>
     </div>
@@ -772,7 +772,7 @@ function TripsStep({
 
       {listing.packages.length === 0 ? (
         <p className="rounded-control border border-dashed border-line p-6 text-center text-sm text-ink-muted">
-          A listing needs at least one trip before it can take bookings.
+          {t('owner', 'noTripsYet')}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -1200,13 +1200,13 @@ function LocationStep({
         )}
       </Field>
 
-      <Field label="Postal code">
+      <Field label={t('owner', 'postalCode')}>
         {({ id }) => (
           <Input id={id} value={postalCode} onChange={(e) => setPostalCode(e.target.value)} autoComplete="postal-code" />
         )}
       </Field>
 
-      <Field label={t('viewCharter', 'directions')} hint="Parking, which dock, how early to arrive.">
+      <Field label={t('viewCharter', 'directions')} hint={t('owner', 'directionsHint')}>
         {({ id }) => (
           <Textarea id={id} value={directions} onChange={(e) => setDirections(e.target.value)} rows={5} />
         )}

@@ -100,18 +100,18 @@ export function OwnerSettings({ user }: { user: PublicUser }) {
             )}
           </Field>
 
-          <Field label={t('viewCharter', 'captainLanguages', { languages: '' }).replace(/\s+$/, '')}>
+          <Field label={t('owner', 'languagesLabel')}>
             {({ id }) => (
               <Input
                 id={id}
                 value={languages}
                 onChange={(e) => setLanguages(e.target.value)}
-                placeholder="English, Spanish"
+                placeholder={t('owner', 'languagesPlaceholder')}
               />
             )}
           </Field>
 
-          <Field label={t('viewCharter', 'captainSince', { year: '' }).replace(/\s+$/, '')}>
+          <Field label={t('owner', 'yearStartedLabel')}>
             {({ id }) => (
               <Input
                 id={id}
@@ -124,7 +124,7 @@ export function OwnerSettings({ user }: { user: PublicUser }) {
             )}
           </Field>
 
-          <Field label={t('viewCharter', 'captainBackground')} hint="Shown on every one of your listings.">
+          <Field label={t('viewCharter', 'captainBackground')} hint={t('owner', 'backgroundHint')}>
             {({ id }) => (
               <Textarea id={id} value={background} onChange={(e) => setBackground(e.target.value)} rows={5} />
             )}

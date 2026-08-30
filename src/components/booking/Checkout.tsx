@@ -615,7 +615,7 @@ export function Checkout({
 
                     <p className="mt-3 flex items-start gap-1.5 text-xs text-ink-muted">
                       <Icon name="lock" size={13} className="mt-0.5 shrink-0" />
-                      Card details are validated and only the last four digits are stored.
+                      {t('booking', 'cardStorageNote')}
                     </p>
                   </div>
                 ) : null}

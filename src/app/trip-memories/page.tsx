@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { translate as t } from '@/i18n/translate';
 import { formatDate } from '@/lib/core/dates';
@@ -11,7 +12,11 @@ import { EmptyState, PhotoFrame, SectionHeading } from '@/components/ui/primitiv
 export const metadata: Metadata = { title: t('memories', 'indexTitle') };
 
 export default async function TripMemoriesPage() {
-  const user = (await currentUser())!;
+  // Outside the /account layout, so nothing upstream has established a
+  // session: the non-null assertion other pages can rely on would 500 here.
+  const user = await currentUser();
+  if (!user) redirect('/login?next=/trip-memories');
+
   const db = await getDb();
   const bookings = memoriesFor(db, user.id);
 

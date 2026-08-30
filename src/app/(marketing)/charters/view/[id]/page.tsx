@@ -281,6 +281,18 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
             ) : null}
           </header>
 
+          {/* Scarcity, only when it is literally true. `scarcity` is null
+              below the threshold, so there is nothing to soften. */}
+          {detail.scarcity ? (
+            <p className="mt-4 flex items-center gap-2 rounded-lg bg-danger/10 px-3 py-2 text-sm font-semibold text-danger">
+              <Icon name="bolt" size={15} />
+              {t('viewCharter', 'goingFast', {
+                count: detail.scarcity.bookingsLastWeek,
+                p: detail.scarcity.bookingsLastWeek,
+              })}
+            </p>
+          ) : null}
+
           <Divider className="my-6" />
           <DescriptionSection charter={detail} />
 
