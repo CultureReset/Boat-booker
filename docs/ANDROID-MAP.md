@@ -10,6 +10,11 @@ colour, terminology and navigation, but only for the screens the publisher
 chose to show, and only above the fold. Nothing here comes from the APK or a
 logged-in session. Screens marked **unmapped** were never shown.
 
+**This document maps what the apps look like.**
+[`PLATFORM-MAP.md`](PLATFORM-MAP.md) maps what the platform *does* — all 79
+routes and 19,767 UI strings, including every screen never shown in a
+screenshot. Read them together.
+
 ## The two apps
 
 | | Package | Store name |
@@ -152,9 +157,9 @@ Ranked by how visible each is to a user.
 | 13 | Guest shown as `Kevin S.` | Full name |
 | 14 | Two separate apps | One app, role-routed |
 
-## Still unmapped
+## Still unmapped visually
 
-Never shown in any store asset, so still inferred:
+Never shown in any store asset, so their **layout** is still inferred:
 
 - **Owner Home** — the dashboard itself, the screen most directly asked about
 - **Owner Menu** tab contents
@@ -163,6 +168,10 @@ Never shown in any store asset, so still inferred:
 - Account, profile, payment methods, payouts, team, verification
 - Everything below the fold on every screen above
 
-Closing those needs either a logged-in session (the web app is Next.js and
-ships its page payload in the HTML, so saved page source would give exact
-structure) or the APK.
+**What every one of these screens does is now mapped.** See
+[`PLATFORM-MAP.md`](PLATFORM-MAP.md) — 79 routes and 19,767 UI strings across
+103 domains, pulled from the production build manifest and translations API.
+That covers fields, steps, states, validation rules and copy for all of the
+above; it does not cover where anything sits on screen.
+
+Closing the remaining visual gap needs either a logged-in session or the APK.

@@ -64,6 +64,9 @@ the authorisation boundaries hold at each step.
   packaging
 - [`docs/ANDROID-MAP.md`](docs/ANDROID-MAP.md) — what the two real Android
   apps look like, and the 14 places this rebuild diverges from them
+- [`docs/PLATFORM-MAP.md`](docs/PLATFORM-MAP.md) — the real platform's complete
+  functional map: 79 routes, 103 string domains, 19,767 UI strings recovered
+  from public build artefacts, and the 26 features this rebuild does not have
 
 ## Modularity
 
