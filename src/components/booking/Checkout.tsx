@@ -81,6 +81,9 @@ export function Checkout({
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('online_deposit');
   const [applyCredit, setApplyCredit] = useState(true);
   const [messageToOwner, setMessageToOwner] = useState('');
+  // Add-on id → quantity. Absent means not chosen; the server re-resolves
+  // these against the live listing, so a retired extra just drops out.
+  const [addOns, setAddOns] = useState<Record<string, number>>({});
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -160,7 +163,7 @@ export function Checkout({
       .finally(() => setQuoting(false));
 
     return () => controller.abort();
-  }, [charter.id, pkg, date, adults, children, paymentMode, currency, applyCredit]);
+  }, [charter.id, pkg, date, adults, children, paymentMode, currency, applyCredit, addOns]);
 
   const submit = useCallback(async () => {
     if (!pkg || !user) return;
@@ -179,6 +182,7 @@ export function Checkout({
         paymentMode,
         currency,
         applyCredit,
+        addOns,
         paymentMethodId: paymentMode === 'on_arrival' ? undefined : selectedCardId || undefined,
         messageToOwner: messageToOwner.trim() || undefined,
         contact: { firstName, lastName, email, phone },
@@ -193,7 +197,7 @@ export function Checkout({
     }
   }, [
     charter.id, pkg, date, departureTime, adults, children, paymentMode, currency, applyCredit,
-    selectedCardId, messageToOwner, firstName, lastName, email, phone, user, refresh, router,
+    addOns, selectedCardId, messageToOwner, firstName, lastName, email, phone, user, refresh, router,
   ]);
 
   if (!pkg) {
@@ -369,6 +373,87 @@ export function Checkout({
             </section>
           ) : (
             <>
+              {/* ------------------------------------------- extras */}
+              {charter.addOns.length ? (
+                <section className="rounded-card border border-line bg-white p-4">
+                  <h2 className="mb-1 text-base font-bold text-ink">{t('addOns', 'guestTitle')}</h2>
+                  <p className="mb-3 text-sm text-ink-muted">{t('addOns', 'guestSubtitle')}</p>
+
+                  <ul className="divide-y divide-line">
+                    {charter.addOns.map((addOn) => {
+                      const quantity = addOns[addOn.id] ?? 0;
+                      const max =
+                        addOn.pricing === 'per_person'
+                          ? Math.min(addOn.maxQuantity, adults + children)
+                          : 1;
+
+                      return (
+                        <li key={addOn.id} className="flex items-start gap-3 py-3">
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-bold text-ink">{addOn.title}</span>
+                            <span className="block text-xs text-ink-muted">{addOn.description}</span>
+                            <span className="mt-0.5 block text-xs font-semibold text-ink-soft">
+                              {money(addOn.price, addOn.currency)}{' '}
+                              {addOn.pricing === 'per_person'
+                                ? t('addOns', 'each')
+                                : t('addOns', 'perBooking').toLowerCase()}
+                            </span>
+                          </span>
+
+                          {max > 1 ? (
+                            <span className="flex shrink-0 items-center gap-2">
+                              <button
+                                type="button"
+                                aria-label={`Fewer ${addOn.title}`}
+                                disabled={quantity === 0}
+                                onClick={() =>
+                                  setAddOns((current) => ({
+                                    ...current,
+                                    [addOn.id]: Math.max(0, quantity - 1),
+                                  }))
+                                }
+                                className="flex h-8 w-8 items-center justify-center rounded-full border border-line disabled:opacity-40"
+                              >
+                                <Icon name="minus" size={14} />
+                              </button>
+                              <span className="w-5 text-center text-sm font-semibold tabular-nums">
+                                {quantity}
+                              </span>
+                              <button
+                                type="button"
+                                aria-label={`More ${addOn.title}`}
+                                disabled={quantity >= max}
+                                onClick={() =>
+                                  setAddOns((current) => ({
+                                    ...current,
+                                    [addOn.id]: Math.min(max, quantity + 1),
+                                  }))
+                                }
+                                className="flex h-8 w-8 items-center justify-center rounded-full border border-line disabled:opacity-40"
+                              >
+                                <Icon name="plus" size={14} />
+                              </button>
+                            </span>
+                          ) : (
+                            <Checkbox
+                              label=""
+                              aria-label={addOn.title}
+                              checked={quantity > 0}
+                              onChange={(e) =>
+                                setAddOns((current) => ({
+                                  ...current,
+                                  [addOn.id]: e.target.checked ? 1 : 0,
+                                }))
+                              }
+                            />
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ) : null}
+
               {/* ------------------------------------------- contact */}
               <section className="rounded-card border border-line bg-white p-4">
                 <h2 className="mb-1 text-base font-bold text-ink">{t('booking', 'contactDetails')}</h2>

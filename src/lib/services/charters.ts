@@ -8,6 +8,8 @@ import {
 } from '@/config/taxonomy';
 import { money } from '@/lib/core/money';
 import type {
+  AddOn,
+  ItineraryStep,
   Charter,
   Database,
   Destination,
@@ -251,7 +253,13 @@ export interface CharterDetail extends Omit<CharterCard, 'photo'> {
   policies: Charter['policies'];
   amenitySections: AmenitySection[];
   highlights: { key: string; title: string; icon: string }[];
-  packages: (TripPackage & { availability?: PackageAvailability })[];
+  packages: (TripPackage & {
+    availability?: PackageAvailability;
+    /** Published itinerary only — a draft is not a promise to a guest. */
+    itinerary?: { days: { steps: ItineraryStep[] }[] };
+  })[];
+  /** Paid extras a guest can add at checkout. */
+  addOns: AddOn[];
   owner: {
     id: string;
     displayName: string;
@@ -333,7 +341,17 @@ export function buildCharterDetail(input: {
     policies: charter.policies,
     amenitySections: amenitySections(charter),
     highlights: highlightAmenities(charter).map((a) => ({ key: a.key, title: a.title, icon: a.icon })),
-    packages: packages.map((pkg) => ({ ...pkg, availability: availabilityByPackage.get(pkg.id) })),
+    packages: packages.map((pkg) => {
+      const itinerary = db.itineraries.find(
+        (i) => i.packageId === pkg.id && i.status === 'published',
+      );
+      return {
+        ...pkg,
+        availability: availabilityByPackage.get(pkg.id),
+        itinerary: itinerary ? { days: itinerary.days } : undefined,
+      };
+    }),
+    addOns: db.addOns.filter((a) => a.charterId === charter.id && a.active),
     owner: {
       id: charter.ownerId,
       displayName: owner?.ownerProfile?.captainName ?? `${owner?.firstName ?? ''} ${owner?.lastName ?? ''}`.trim(),

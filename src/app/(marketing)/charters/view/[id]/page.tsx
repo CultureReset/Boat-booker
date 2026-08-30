@@ -25,6 +25,7 @@ import {
   ReviewsSection,
   SimilarSection,
 } from '@/components/listing/ListingSections';
+import { ItinerarySection } from '@/components/listing/Itinerary';
 
 /**
  * Listing detail page.
@@ -130,6 +131,11 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
     revealExactAddress,
   });
   if (!detail) notFound();
+
+  // Show the itinerary of the cheapest trip, which is the one most guests
+  // land on; each trip's own itinerary appears when they pick it.
+  const itineraryDays =
+    detail.packages.find((p) => p.itinerary)?.itinerary?.days ?? [];
 
   const reviewPage = reviewsForCharter(db, charter.id, { page: 1, perPage: 6 });
   const statistics = reviewStatisticsFor(db.reviews.filter((r) => r.charterId === charter.id));
@@ -277,6 +283,15 @@ export default async function ListingPage({ params, searchParams }: PageProps) {
 
           <Divider className="my-6" />
           <DescriptionSection charter={detail} />
+
+          {/* The itinerary sits directly under the description because it is
+              the thing a guest reads next: what actually happens on the day. */}
+          {itineraryDays.length ? (
+            <>
+              <Divider className="my-6" />
+              <ItinerarySection days={itineraryDays} />
+            </>
+          ) : null}
 
           <Divider className="my-6" />
           <BoatSection charter={detail} />
