@@ -45,9 +45,17 @@ export interface PackageAvailability {
 }
 
 /** Index the blocking records once so per-date checks stay O(1). */
-export function buildBlockIndex(db: Database) {
+/**
+ * @param ignoreBookingId Leaves one booking's own holds out of the index.
+ *   A booking being changed must not block itself: extending a trip from one
+ *   day to two, or moving its departure, starts on a date this very booking
+ *   holds, and counting that as taken makes the change impossible for a reason
+ *   that does not exist.
+ */
+export function buildBlockIndex(db: Database, ignoreBookingId?: string) {
   const byCharterDate = new Map<string, AvailabilityBlock[]>();
   for (const block of db.availability) {
+    if (ignoreBookingId && block.bookingId === ignoreBookingId) continue;
     const key = `${block.charterId}:${block.date}`;
     const list = byCharterDate.get(key);
     if (list) list.push(block);

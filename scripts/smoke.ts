@@ -312,18 +312,245 @@ async function main(): Promise<void> {
   check('profile updates', profile.data?.user?.bio === 'Smoke test bio', profile.error);
   await customer.patch('/api/me', { currency: 'USD' });
 
+  // ------------------------------------------------------- change requests
+  section('Change requests');
+  // A change that moves the price goes to manual review by design, and the
+  // booking deliberately stays put until a person confirms it. To exercise the
+  // *applied* path the replacement date has to price identically, so quote the
+  // candidates and take the first that matches.
+  const candidates = afterBooking.data.days
+    .filter((d) => d.state === 'available' && d.date !== openDay!.date)
+    .map((d) => d.date)
+    .slice(0, 20);
+
+  let newDate = '';
+  for (const candidate of candidates) {
+    const candidateQuote = await customer.post<{ available: boolean; breakdown: { total: number } }>(
+      '/api/bookings/quote',
+      { ...quotePayload, date: candidate },
+    );
+    if (
+      candidateQuote.data?.available &&
+      Math.abs(candidateQuote.data.breakdown.total - quote.data.breakdown.total) < 0.01
+    ) {
+      newDate = candidate;
+      break;
+    }
+  }
+  check('a same-price date exists to move to', Boolean(newDate), candidates.slice(0, 5));
+
+  // A change that moves money must not apply on a tap — it goes to a person.
+  // Adding a guest is the cheapest way to move the price on any listing.
+  const pricedChange = await customer.post<{
+    changeRequest: { id: string; priceDifference: number };
+  }>(`/api/bookings/${booking.data.id}`, {
+    action: 'request_change',
+    requested: { days: 2 },
+    note: 'Smoke test — stretching the trip to two days.',
+  });
+  check('a duration change is priced', pricedChange.status === 200, pricedChange.error);
+  check(
+    'a second day moves the price',
+    (pricedChange.data?.changeRequest?.priceDifference ?? 0) > 0,
+    pricedChange.data?.changeRequest,
+  );
+
+  const withdrawn = await customer.post<{ booking: { status: string } }>(
+    `/api/bookings/${booking.data.id}`,
+    { action: 'withdraw_change', changeRequestId: pricedChange.data.changeRequest.id },
+  );
+  check('the requester can withdraw', withdrawn.status === 200, withdrawn.error);
+  check('withdrawing restores the booking', withdrawn.data?.booking?.status === 'confirmed', withdrawn.data?.booking);
+
+  const changeRequested = await customer.post<{
+    booking: { status: string };
+    changeRequest: { id: string; status: string; priceDifference: number };
+  }>(`/api/bookings/${booking.data.id}`, {
+    action: 'request_change',
+    requested: { date: newDate },
+    note: 'Smoke test — moving the trip a day.',
+  });
+  check('change request is raised', changeRequested.status === 200, changeRequested.error);
+  check(
+    'booking moves to change_requested',
+    changeRequested.data?.booking?.status === 'change_requested',
+    changeRequested.data?.booking,
+  );
+
+  // The original date must still be held while the change is outstanding —
+  // releasing it early would let someone else take it and strand the guest.
+  const duringChange = await guest.get<{ days: { date: string; state: string }[] }>(
+    `/api/charters/${ownerCharterId}/availability?days=180`,
+  );
+  check(
+    'original date is held during the change',
+    duringChange.data.days.find((d) => d.date === openDay!.date)?.state === 'booked',
+  );
+
+  check(
+    'a same-price change carries no price difference',
+    changeRequested.data?.changeRequest?.priceDifference === 0,
+    changeRequested.data?.changeRequest,
+  );
+
+  const changeAccepted = await owner.post<{
+    booking: { status: string; date: string };
+    needsSupportReview: boolean;
+  }>(`/api/bookings/${booking.data.id}`, {
+    action: 'accept_change',
+    changeRequestId: changeRequested.data.changeRequest.id,
+  });
+  check('owner accepts the change', changeAccepted.status === 200, changeAccepted.error);
+  check(
+    'a same-price change applies without support review',
+    changeAccepted.data?.needsSupportReview === false,
+    changeAccepted.data,
+  );
+  check('booking moves to the new date', changeAccepted.data?.booking?.date === newDate, changeAccepted.data?.booking);
+  check('booking is confirmed again', changeAccepted.data?.booking?.status === 'confirmed', changeAccepted.data?.booking);
+
+  const afterChange = await guest.get<{ days: { date: string; state: string }[] }>(
+    `/api/charters/${ownerCharterId}/availability?days=180`,
+  );
+  check(
+    'old date is released once the new one is secured',
+    afterChange.data.days.find((d) => d.date === openDay!.date)?.state === 'available',
+  );
+  check(
+    'new date is now held',
+    afterChange.data.days.find((d) => d.date === newDate)?.state === 'booked',
+  );
+
+  // ---------------------------------------------------------------- offers
+  section('Offers');
+  const ownerThreads = await owner.get<
+    { id: string; charterId: string; counterparty: { id: string } }[]
+  >('/api/inbox');
+  // The thread has to be with *this* guest, or the offer lands in someone
+  // else's inbox and the assertion below tests nothing.
+  const offerThread = ownerThreads.data?.find(
+    (t) => t.charterId === ownerCharterId && t.counterparty.id === login.data.user.id,
+  );
+  check('owner has a conversation with this guest', Boolean(offerThread), ownerThreads.error);
+
+  const offerDate = candidates.find((d) => d !== newDate) ?? candidates[0];
+  const offer = await owner.post<{ id: string; status: string; expiresAt: string; price: number }>(
+    '/api/offers',
+    {
+      threadId: offerThread!.id,
+      packageId: pkg.id,
+      date: offerDate,
+      departureTime: pkg.departureTimes[0],
+      adults: guests,
+      children: 0,
+      days: 1,
+      price: Math.round(quote.data.breakdown.total * 0.85),
+    },
+  );
+  check('offer is created', offer.status === 201, offer.error);
+  check('offer starts as sent', offer.data?.status === 'sent', offer.data);
+
+  // An outstanding offer does not hold the date — availability is re-checked
+  // when the guest accepts, so two offers on one date is not a bug.
+  const duringOffer = await guest.get<{ days: { date: string; state: string }[] }>(
+    `/api/charters/${ownerCharterId}/availability?days=180`,
+  );
+  check(
+    'an outstanding offer does not hold the date',
+    duringOffer.data.days.find((d) => d.date === offerDate)?.state === 'available',
+  );
+
+  const secondOffer = await owner.post('/api/offers', {
+    threadId: offerThread!.id,
+    packageId: pkg.id,
+    date: offerDate,
+    departureTime: pkg.departureTimes[0],
+    adults: guests,
+    children: 0,
+    days: 1,
+    price: 100,
+  });
+  check('a second offer on the same thread is refused', secondOffer.status >= 400, secondOffer.data);
+
+  const guestOffers = await customer.get<{ id: string; role: string }[]>('/api/offers');
+  check('the guest sees the offer', guestOffers.data?.some((o) => o.id === offer.data.id), guestOffers.error);
+
+  const withdrawnOffer = await owner.patch<{ status: string }>('/api/offers', {
+    offerId: offer.data.id,
+    action: 'withdraw',
+  });
+  check('offer withdraws', withdrawnOffer.data?.status === 'withdrawn', withdrawnOffer.error);
+
+  // ------------------------------------------------------------- payments
+  section('Payments');
+  const balanceLink = await customer.post<{ token: string }>('/api/payments', {
+    action: 'request_link',
+    bookingId: booking.data.id,
+  });
+  check('balance link is issued', Boolean(balanceLink.data?.token), balanceLink.error);
+
+  const scheduled = await customer.post<{ balance: { collection: string } }>('/api/payments', {
+    action: 'schedule',
+    bookingId: booking.data.id,
+    mode: 'online_anytime',
+  });
+  check('balance collection can be changed', scheduled.status === 200, scheduled.error);
+
+  const tipTooEarly = await customer.post('/api/payments', {
+    action: 'tip',
+    bookingId: booking.data.id,
+    amount: 25,
+  });
+  check('tipping before the trip is refused', tipTooEarly.status >= 400, tipTooEarly.data);
+
+  // ---------------------------------------------------------------- social
+  section('Social');
+  const shared = await customer.post<{ token: string }>('/api/social', { action: 'share_wishlist' });
+  check('wishlist shares', Boolean(shared.data?.token), shared.error);
+
+  const revoked = await customer.post<{ revoked: boolean }>('/api/social', {
+    action: 'revoke_wishlist',
+  });
+  check('wishlist share revokes', revoked.data?.revoked === true, revoked.error);
+
+  // -------------------------------------------------------- notifications
+  section('Notifications');
+  const notifications = await customer.get<{ id: string }[]>('/api/notifications');
+  check('notification feed loads', notifications.status === 200, notifications.error);
+  check('booking activity produced notifications', (notifications.data?.length ?? 0) > 0, notifications.data);
+
+  const readAll = await customer.post<{ marked: number }>('/api/notifications', { all: true });
+  check('notifications mark read', readAll.status === 200, readAll.error);
+  check('marking read reports a count', typeof readAll.data?.marked === 'number', readAll.data);
+
   // ---------------------------------------------------------- cancellation
   section('Cancellation');
-  const cancelled = await customer.post<{ booking: { status: string }; refund: number }>(
+
+  // The preview must not mutate: it is what the cancel screen shows before the
+  // guest has decided anything.
+  const preview = await customer.post<{ refund: number; free: boolean }>(
     `/api/bookings/${booking.data.id}`,
-    { action: 'cancel', reason: 'Smoke test cleanup' },
+    { action: 'preview_cancel', reason: 'plans_changed' },
   );
+  check('cancellation preview responds', preview.status === 200, preview.error);
+
+  const stillLive = await customer.get<{ status: string }>(`/api/bookings/${booking.data.id}`);
+  check('preview did not cancel the booking', stillLive.data?.status === 'confirmed', stillLive.data);
+
+  const cancelled = await customer.post<{
+    booking: { status: string };
+    refund: number;
+    penalties: unknown[];
+  }>(`/api/bookings/${booking.data.id}`, { action: 'cancel', reason: 'plans_changed' });
   check('booking cancels', cancelled.data?.booking?.status === 'cancelled', cancelled.error);
+  check('cancellation reports penalties', Array.isArray(cancelled.data?.penalties), cancelled.data);
 
   const afterCancel = await guest.get<{ days: { date: string; state: string }[] }>(
     `/api/charters/${ownerCharterId}/availability?days=180`,
   );
-  const releasedDay = afterCancel.data.days.find((d) => d.date === openDay!.date);
+  // The date the booking ended up on after the change, not the one it started
+  // on — that was released when the change was accepted.
+  const releasedDay = afterCancel.data.days.find((d) => d.date === newDate);
   check('cancelled date is released', releasedDay?.state === 'available', releasedDay);
 
   // ---------------------------------------------------------------- owner
@@ -393,8 +620,92 @@ async function main(): Promise<void> {
   });
   check('dates block', blocked.data?.changed === 2, blocked.error);
 
+  // -------------------------------------------------- itineraries and extras
+  section('Itineraries and add-ons');
+  const itinerary = await owner.post<{ id: string; status: string }>(
+    `/api/owner/listings/${draft.data.id}/itineraries`,
+    {
+      action: 'save',
+      packageId: trip.data.id,
+      days: [
+        {
+          steps: [
+            { title: 'Meet at the dock', description: 'Find the crew at the slip.', minutes: 20 },
+            { title: 'Head out', description: 'Run past the breakwater.', minutes: 40 },
+          ],
+        },
+      ],
+    },
+  );
+  check('itinerary saves as a draft', itinerary.status === 200 || itinerary.status === 201, itinerary.error);
+  check('a saved itinerary starts as a draft', itinerary.data?.status === 'draft', itinerary.data);
+
+  const published = await owner.post<{ status: string }>(
+    `/api/owner/listings/${draft.data.id}/itineraries`,
+    { action: 'publish', itineraryId: itinerary.data.id },
+  );
+  check('itinerary publishes', published.data?.status === 'published', published.error);
+
+  const thinItinerary = await owner.post(`/api/owner/listings/${draft.data.id}/itineraries`, {
+    action: 'save',
+    packageId: trip.data.id,
+    days: [{ steps: [{ title: 'Only step', description: 'Not enough.', minutes: 30 }] }],
+  });
+  check('an itinerary day below the step minimum is refused', thinItinerary.status === 400, thinItinerary);
+
+  const addOn = await owner.post<{ id: string; price: number }>(
+    `/api/owner/listings/${draft.data.id}/add-ons`,
+    { title: 'Snorkel kit', description: 'Mask, fins and snorkel.', price: 25, pricing: 'per_person', maxQuantity: 8 },
+  );
+  check('add-on is created', addOn.status === 200 || addOn.status === 201, addOn.error);
+
+  const addOns = await owner.get<{ id: string }[]>(`/api/owner/listings/${draft.data.id}/add-ons`);
+  check('add-on is listed', addOns.data?.some((a) => a.id === addOn.data.id), addOns.error);
+
   const cleanup = await owner.del(`/api/owner/listings/${draft.data.id}`);
   check('draft listing deletes', cleanup.status === 200, cleanup);
+
+  // --------------------------------------------------------- quick replies
+  section('Quick replies');
+  const quickReply = await owner.post<{ id: string; title: string }>('/api/owner/quick-replies', {
+    title: 'Smoke reply',
+    body: 'Hi %customer_name%, yes the %date% is open.',
+  });
+  check('quick reply saves', quickReply.status === 200 || quickReply.status === 201, quickReply.error);
+
+  const quickReplies = await owner.get<{ replies: { id: string }[]; placeholders: unknown[] }>(
+    '/api/owner/quick-replies',
+  );
+  check('quick reply is listed', quickReplies.data?.replies?.some((q) => q.id === quickReply.data.id));
+  check('placeholders are advertised', (quickReplies.data?.placeholders?.length ?? 0) > 0);
+
+  const removedReply = await owner.post('/api/owner/quick-replies', {
+    remove: true,
+    id: quickReply.data.id,
+  });
+  check('quick reply deletes', removedReply.status === 200, removedReply.error);
+
+  // ---------------------------------------------------------------- direct
+  section('Direct');
+  const directOff = await owner.post('/api/owner/direct', { action: 'enable', acceptTerms: false });
+  check('Direct cannot be enabled without accepting terms', directOff.status === 400, directOff);
+
+  const directOn = await owner.post<{ enabled: boolean }>('/api/owner/direct', {
+    action: 'enable',
+    acceptTerms: true,
+    feeBearer: 'owner',
+  });
+  check('Direct enables', directOn.status === 200, directOn.error);
+
+  const invite = await owner.post<{ token: string }>('/api/owner/direct', {
+    action: 'invite',
+    charterId: ownerCharterId,
+    channel: 'qr',
+  });
+  check('Direct invite is issued', Boolean(invite.data?.token), invite.error);
+
+  const directRevert = await owner.post('/api/owner/direct', { action: 'disable' });
+  check('Direct disables', directRevert.status === 200, directRevert.error);
 
   // ---------------------------------------------------------------- logout
   section('Logout');

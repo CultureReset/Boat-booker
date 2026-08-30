@@ -1531,6 +1531,7 @@ export const catalog = {
     referralsBody:
       'Give a friend %amount% off their first trip. When they travel, you get %amount% in boating credit.',
     referralCode: 'Your invite code',
+    yourLevel: 'Your level',
     creditBalance: 'Credit balance',
     creditEmpty: 'No credit yet.',
     savedSuccess: 'Your changes were saved.',

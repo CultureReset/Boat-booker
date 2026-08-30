@@ -74,7 +74,7 @@ export function OwnerSettings({ user }: { user: PublicUser }) {
       ) : null}
 
       <section className="rounded-card border border-line bg-white p-4">
-        <h2 className="mb-4 text-base font-bold text-ink">{t('owner', 'settingsTitle')}</h2>
+        <h2 className="mb-4 text-base font-bold text-ink">{t('owner', 'businessInfo')}</h2>
 
         <div className="grid gap-4">
           <Field label={t('owner', 'businessName')} required>

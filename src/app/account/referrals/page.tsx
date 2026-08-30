@@ -27,8 +27,7 @@ export default async function ReferralsPage() {
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-700">
           <Icon name="users" size={24} />
         </span>
-        <h2 className="mt-3 text-lg font-bold text-ink">{t('account', 'referralsTitle')}</h2>
-        <p className="mt-1.5 text-sm text-ink-soft">{t('account', 'referralsBody', { amount })}</p>
+        <p className="mt-3 text-sm text-ink-soft">{t('account', 'referralsBody', { amount })}</p>
 
         <div className="mt-4 space-y-3">
           <CopyField label={t('account', 'referralCode')} value={summary.referralCode} />

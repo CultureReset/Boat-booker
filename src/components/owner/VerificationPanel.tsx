@@ -8,7 +8,7 @@ import { api, errorMessage } from '@/lib/client/api';
 import { useToast } from '@/components/providers/ToastProvider';
 import type { VerificationState } from '@/lib/domain/types';
 import { Icon } from '@/components/ui/Icon';
-import { Badge, Button, Field, Input, Select } from '@/components/ui/primitives';
+import { Button, Field, Input, Select } from '@/components/ui/primitives';
 import { cx } from '@/components/ui/cx';
 
 /**
@@ -52,10 +52,10 @@ export function VerificationPanel({ verification: initial }: { verification: Ver
     }
   };
 
-  const statusTone =
-    verification.status === 'verified' ? 'success'
-    : verification.status === 'pending' ? 'warning'
-    : 'neutral';
+  const statusColour =
+    verification.status === 'verified' ? 'text-success'
+    : verification.status === 'pending' ? 'text-warning'
+    : 'text-ink';
 
   const statusLabel =
     verification.status === 'verified' ? t('owner', 'verificationStatusVerified')
@@ -84,10 +84,10 @@ export function VerificationPanel({ verification: initial }: { verification: Ver
             <Icon name="shield" size={22} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-2 text-base font-bold text-ink">
-              {t('owner', 'verificationTitle')}
-              <Badge tone={statusTone}>{statusLabel}</Badge>
-            </p>
+            {/* The status is the headline: the page heading above already
+                says what this screen is, so repeating it here would cost the
+                one line that tells the operator where they stand. */}
+            <p className={cx('text-base font-bold', statusColour)}>{statusLabel}</p>
             <p className="mt-1 text-sm text-ink-muted">{t('owner', 'verificationBody')}</p>
           </div>
         </div>

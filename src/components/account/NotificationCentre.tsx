@@ -7,7 +7,7 @@ import { translate as t } from '@/i18n/translate';
 import { timeAgo } from '@/lib/core/dates';
 import { api } from '@/lib/client/api';
 import { Icon, type IconName } from '@/components/ui/Icon';
-import { Button, EmptyState } from '@/components/ui/primitives';
+import { EmptyState } from '@/components/ui/primitives';
 import { cx } from '@/components/ui/cx';
 import type { Notification, NotificationCategory } from '@/lib/domain/types';
 
@@ -90,10 +90,18 @@ export function NotificationCentre({
           {!archived && counts.archived ? ` (${counts.archived})` : ''}
         </Link>
 
+        {/* Styled as a link, not a button: it is the peer of "See archived"
+            opposite it, and a filled control here would outweigh the
+            notifications themselves. */}
         {!archived && counts.unread > 0 ? (
-          <Button size="sm" variant="ghost" disabled={busy} onClick={() => act({ all: true })}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => act({ all: true })}
+            className="text-sm font-semibold text-brand-700 hover:underline disabled:opacity-50"
+          >
             {t('notifications', 'markAllRead')}
-          </Button>
+          </button>
         ) : null}
       </div>
 

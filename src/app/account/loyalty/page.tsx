@@ -31,7 +31,7 @@ export default async function LoyaltyPage() {
       <section className="rounded-card bg-ink p-5 text-white">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-wide text-white/60">{t('account', 'loyaltyTitle')}</p>
+            <p className="text-xs uppercase tracking-wide text-white/60">{t('account', 'yourLevel')}</p>
             <p className="mt-1 text-2xl font-extrabold">
               {loyalty.level > 0 ? t('account', 'loyaltyLevel', { level: loyalty.level }) : t('bookings', 'statusPending')}
             </p>

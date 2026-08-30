@@ -69,33 +69,55 @@ function requireBooking(db: Database, bookingId: string): Booking {
 /**
  * What the booking would cost with the requested fields applied.
  *
- * Recomputed from the pricing engine rather than adjusted arithmetically, so a
- * change that crosses a group-size threshold or a multi-day discount is priced
- * the same way a fresh booking would be.
+ * Priced by the engine rather than adjusted arithmetically, so a change that
+ * crosses a group-size threshold or a multi-day discount is priced the way a
+ * fresh booking would be.
+ *
+ * The difference is measured between two runs of the engine — the fields as
+ * they are, and the fields as requested — not between a fresh run and the
+ * booking's stored total. Those are not comparable: the stored total carries
+ * the loyalty discount, credit, promo and add-ons that were in play at
+ * checkout, and none of them are inputs here. Comparing across that gap made
+ * every change look like a price change to any guest with a loyalty tier, and
+ * a price change goes to manual review — so moving a booking by one day sat
+ * waiting on a human for no reason. Repricing both sides on identical terms
+ * cancels the constant out, leaving only what the change itself moved.
  */
 export function priceChange(
   db: Database,
   booking: Booking,
   requested: ChangeRequestFields,
 ): { total: number; difference: number; currency: string } {
-  const merged = { ...currentFields(booking), ...requested };
+  const current = currentFields(booking);
+  const merged = { ...current, ...requested };
   const charter = db.charters.find((c) => c.id === booking.charterId);
-  const pkg = db.packages.find((p) => p.id === merged.packageId);
-  if (!charter || !pkg) return { total: booking.breakdown.total, difference: 0, currency: booking.currency };
+  if (!charter) return { total: booking.breakdown.total, difference: 0, currency: booking.currency };
 
-  const breakdown = computeBreakdown({
-    charter,
-    pkg,
-    adults: merged.adults,
-    children: merged.children,
-    days: merged.days,
-    paymentMode: booking.paymentMode,
-    currency: booking.currency,
-  });
+  const priceFor = (fields: Required<ChangeRequestFields>): number | null => {
+    const pkg = db.packages.find((p) => p.id === fields.packageId);
+    if (!pkg) return null;
+    return computeBreakdown({
+      charter,
+      pkg,
+      adults: fields.adults,
+      children: fields.children,
+      days: fields.days,
+      paymentMode: booking.paymentMode,
+      currency: booking.currency,
+    }).total;
+  };
+
+  const before = priceFor(current);
+  const after = priceFor(merged);
+  if (before === null || after === null) {
+    return { total: booking.breakdown.total, difference: 0, currency: booking.currency };
+  }
+
+  const difference = roundMoney(after - before, booking.currency);
 
   return {
-    total: breakdown.total,
-    difference: roundMoney(breakdown.total - booking.breakdown.total, booking.currency),
+    total: roundMoney(booking.breakdown.total + difference, booking.currency),
+    difference,
     currency: booking.currency,
   };
 }
@@ -149,15 +171,16 @@ export function requestChange(db: Database, input: RequestChangeInput): ChangeRe
     throw new ChangeError('invalid', 'Group size cannot be changed on a shared trip');
   }
 
-  // Check the *new* date is open, ignoring this booking's own hold on the old
-  // one. Requesting never releases the original slot.
+  // Check the *new* dates are open, ignoring this booking's own hold on the
+  // old ones — requesting never releases the original slot, and without the
+  // exclusion a booking blocks its own extension.
   if (merged.date !== current.date || merged.days !== current.days) {
     const availability = packageAvailability({
       pkg,
       date: merged.date,
       guests: merged.adults + merged.children,
       days: merged.days,
-      blockIndex: buildBlockIndex(db),
+      blockIndex: buildBlockIndex(db, booking.id),
     });
     if (!availability.available) {
       throw new ChangeError('unavailable', availability.reason ?? 'Those dates are not available');
