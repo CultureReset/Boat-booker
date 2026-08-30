@@ -1,0 +1,515 @@
+import { commerceConfig } from '@/config/brand';
+import { addDays, daysBetween, isPast, today } from '@/lib/core/dates';
+import { newBookingReference, newId } from '@/lib/core/ids';
+import { roundMoney } from '@/lib/core/money';
+import type {
+  Booking,
+  BookingStatus,
+  Database,
+  PaymentMode,
+  PriceBreakdown,
+} from '@/lib/domain/types';
+import { buildBlockIndex, packageAvailability, releaseDates, reserveDates } from './availability';
+import { computeBreakdown, loyaltyTierFor, refundFor } from './pricing';
+
+/**
+ * Booking lifecycle.
+ *
+ * Statuses move in one direction only:
+ *
+ *   pending ──accept──▶ confirmed ──trip date passes──▶ completed
+ *      │                    │
+ *      ├──decline──▶ declined   └──cancel──▶ cancelled
+ *      └──window elapses──▶ expired
+ *
+ * Every transition that frees a date releases the calendar block, and every
+ * transition that takes one reserves it, so the calendar can never drift from
+ * the booking table.
+ */
+
+export class BookingError extends Error {
+  constructor(
+    readonly code:
+      | 'charter_not_found'
+      | 'package_not_found'
+      | 'unavailable'
+      | 'capacity_exceeded'
+      | 'min_persons'
+      | 'past_date'
+      | 'invalid_date'
+      | 'not_found'
+      | 'forbidden'
+      | 'invalid_transition',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'BookingError';
+  }
+}
+
+export interface QuoteInput {
+  charterId: string;
+  packageId: string;
+  date: string;
+  adults: number;
+  children: number;
+  days: number;
+  paymentMode: PaymentMode;
+  currency: string;
+  customerId?: string;
+  promoDiscount?: number;
+  applyCredit?: boolean;
+}
+
+export interface Quote {
+  breakdown: PriceBreakdown;
+  available: boolean;
+  reason?: string;
+  freeCancellationUntil: string | null;
+  instantBook: boolean;
+  loyaltyDiscountPercent: number;
+  creditApplied: number;
+}
+
+/**
+ * Price and availability for a prospective booking. Checkout renders this and
+ * `createBooking` recomputes it server-side, so a tampered client price is
+ * simply ignored.
+ */
+export function quote(db: Database, input: QuoteInput): Quote {
+  const charter = db.charters.find((c) => c.id === input.charterId);
+  if (!charter) throw new BookingError('charter_not_found', 'Listing not found');
+
+  const pkg = db.packages.find((p) => p.id === input.packageId && p.charterId === charter.id);
+  if (!pkg) throw new BookingError('package_not_found', 'Trip not found');
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
+    throw new BookingError('invalid_date', 'Invalid trip date');
+  }
+
+  const guests = input.adults + input.children;
+  const availability = packageAvailability({
+    pkg,
+    date: input.date,
+    guests,
+    days: input.days,
+    blockIndex: buildBlockIndex(db),
+  });
+
+  const customer = input.customerId ? db.users.find((u) => u.id === input.customerId) : undefined;
+  const loyalty = customer ? loyaltyTierFor(customer.completedTrips) : { discountPercentage: 0 };
+
+  // Credit is capped at the customer's balance and never turns a booking into
+  // a refund, which `computeBreakdown` enforces by clamping to the total.
+  const creditAvailable = input.applyCredit && customer ? customer.creditBalance : 0;
+
+  const breakdown = computeBreakdown({
+    charter,
+    pkg,
+    adults: input.adults,
+    children: input.children,
+    days: input.days,
+    paymentMode: input.paymentMode,
+    currency: input.currency,
+    loyaltyDiscountPercent: loyalty.discountPercentage,
+    creditApplied: creditAvailable,
+    promoDiscount: input.promoDiscount,
+  });
+
+  const creditLine = breakdown.lines.find((l) => l.key === 'credit');
+
+  const freeDays = charter.policies.freeCancellationDaysInAdvance;
+
+  return {
+    breakdown,
+    available: availability.available,
+    reason: availability.reason,
+    freeCancellationUntil: freeDays > 0 ? addDays(input.date, -freeDays) : null,
+    instantBook: charter.policies.isInstantBookActive,
+    loyaltyDiscountPercent: loyalty.discountPercentage,
+    creditApplied: creditLine ? Math.abs(creditLine.amount) : 0,
+  };
+}
+
+export interface CreateBookingInput extends QuoteInput {
+  customerId: string;
+  departureTime: string;
+  contact: { firstName: string; lastName: string; email: string; phone: string };
+  messageToOwner?: string;
+  paymentMethodId?: string;
+}
+
+/**
+ * Create a booking.
+ *
+ * Availability is re-checked and the calendar days claimed inside the same
+ * synchronous mutation, so two guests racing for the last date cannot both
+ * win — the second `reserveDates` call sees the first one's block.
+ */
+export function createBooking(db: Database, input: CreateBookingInput): Booking {
+  const charter = db.charters.find((c) => c.id === input.charterId);
+  if (!charter) throw new BookingError('charter_not_found', 'Listing not found');
+
+  const pkg = db.packages.find((p) => p.id === input.packageId && p.charterId === charter.id);
+  if (!pkg) throw new BookingError('package_not_found', 'Trip not found');
+
+  if (isPast(input.date)) throw new BookingError('past_date', 'Trip date is in the past');
+
+  const guests = input.adults + input.children;
+  if (guests > pkg.capacity) {
+    throw new BookingError('capacity_exceeded', 'Group is larger than this trip allows');
+  }
+  if (guests < pkg.minPersons) {
+    throw new BookingError('min_persons', 'Group is smaller than this trip allows');
+  }
+
+  const availability = packageAvailability({
+    pkg,
+    date: input.date,
+    guests,
+    days: input.days,
+    blockIndex: buildBlockIndex(db),
+  });
+  if (!availability.available) {
+    throw new BookingError('unavailable', availability.reason ?? 'Not available');
+  }
+
+  // Recompute the price server-side; the client's number is never trusted.
+  const priced = quote(db, input);
+
+  const instant = charter.policies.isInstantBookActive;
+  const status: BookingStatus = instant ? 'confirmed' : 'pending';
+  const nowIso = new Date().toISOString();
+
+  const booking: Booking = {
+    id: newId(),
+    reference: newBookingReference(),
+    charterId: charter.id,
+    packageId: pkg.id,
+    customerId: input.customerId,
+    ownerId: charter.ownerId,
+    status,
+    date: input.date,
+    departureTime: pkg.departureTimes.includes(input.departureTime)
+      ? input.departureTime
+      : pkg.departureTimes[0],
+    adults: input.adults,
+    children: input.children,
+    days: input.days,
+    currency: priced.breakdown.currency,
+    breakdown: priced.breakdown,
+    paymentMode: input.paymentMode,
+    paymentMethodId: input.paymentMethodId,
+    messageToOwner: input.messageToOwner,
+    contact: input.contact,
+    createdAt: nowIso,
+    confirmedAt: instant ? nowIso : undefined,
+    respondByAt: instant
+      ? undefined
+      : new Date(Date.now() + commerceConfig.inquiryResponseWindowHours * 3_600_000).toISOString(),
+  };
+
+  // A pending request also holds the date — otherwise the owner could accept a
+  // request for a day that was sold underneath them.
+  if (!reserveDates(db, booking, () => newId())) {
+    throw new BookingError('unavailable', 'Those dates were just taken');
+  }
+
+  db.bookings.push(booking);
+
+  // Spend the credit that was applied to this booking.
+  if (priced.creditApplied > 0) {
+    const customer = db.users.find((u) => u.id === input.customerId);
+    if (customer) {
+      customer.creditBalance = roundMoney(Math.max(0, customer.creditBalance - priced.creditApplied));
+    }
+  }
+
+  if (status === 'confirmed') schedulePayout(db, booking);
+
+  // Open a message thread so the guest and owner have somewhere to talk.
+  const thread = {
+    id: newId(),
+    customerId: input.customerId,
+    ownerId: charter.ownerId,
+    charterId: charter.id,
+    bookingId: booking.id,
+    subject: charter.title,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+  db.threads.push(thread);
+
+  if (input.messageToOwner?.trim()) {
+    db.messages.push({
+      id: newId(),
+      threadId: thread.id,
+      senderId: input.customerId,
+      body: input.messageToOwner.trim(),
+      createdAt: nowIso,
+    });
+  }
+
+  notify(db, charter.ownerId, {
+    kind: 'booking',
+    title: instant ? 'New booking confirmed' : 'New booking request',
+    body: `${input.contact.firstName} ${input.contact.lastName} · ${booking.date} · ${guests} guests`,
+    href: `/owner/bookings/${booking.id}`,
+  });
+
+  return booking;
+}
+
+export function acceptBooking(db: Database, bookingId: string, ownerId: string): Booking {
+  const booking = requireBooking(db, bookingId);
+  if (booking.ownerId !== ownerId) throw new BookingError('forbidden', 'Not your booking');
+  if (booking.status !== 'pending') {
+    throw new BookingError('invalid_transition', 'Only pending bookings can be accepted');
+  }
+
+  booking.status = 'confirmed';
+  booking.confirmedAt = new Date().toISOString();
+  schedulePayout(db, booking);
+
+  notify(db, booking.customerId, {
+    kind: 'booking',
+    title: 'Your trip is confirmed',
+    body: `Booking ${booking.reference} on ${booking.date} is confirmed.`,
+    href: `/account/bookings/${booking.id}`,
+  });
+
+  return booking;
+}
+
+export function declineBooking(
+  db: Database,
+  bookingId: string,
+  ownerId: string,
+  reason?: string,
+): Booking {
+  const booking = requireBooking(db, bookingId);
+  if (booking.ownerId !== ownerId) throw new BookingError('forbidden', 'Not your booking');
+  if (booking.status !== 'pending') {
+    throw new BookingError('invalid_transition', 'Only pending bookings can be declined');
+  }
+
+  booking.status = 'declined';
+  booking.cancelledAt = new Date().toISOString();
+  booking.cancellationReason = reason;
+  releaseDates(db, booking.id);
+  refundCredit(db, booking);
+
+  notify(db, booking.customerId, {
+    kind: 'booking',
+    title: 'Booking request declined',
+    body: reason
+      ? `${booking.reference} was declined: ${reason}`
+      : `${booking.reference} was declined by the owner.`,
+    href: `/account/bookings/${booking.id}`,
+  });
+
+  return booking;
+}
+
+export interface CancellationOutcome {
+  booking: Booking;
+  refund: number;
+  forfeited: number;
+  free: boolean;
+}
+
+/** Cancel as the customer. Refund follows the listing's cancellation policy. */
+export function cancelBooking(
+  db: Database,
+  bookingId: string,
+  actorId: string,
+  reason?: string,
+): CancellationOutcome {
+  const booking = requireBooking(db, bookingId);
+
+  const isCustomer = booking.customerId === actorId;
+  const isOwner = booking.ownerId === actorId;
+  if (!isCustomer && !isOwner) throw new BookingError('forbidden', 'Not your booking');
+
+  if (booking.status !== 'pending' && booking.status !== 'confirmed') {
+    throw new BookingError('invalid_transition', 'This booking can no longer be cancelled');
+  }
+
+  const charter = db.charters.find((c) => c.id === booking.charterId);
+  const daysUntil = daysBetween(today(), booking.date);
+
+  // An owner cancelling is always a full refund — the guest did nothing wrong.
+  const outcome = isOwner
+    ? { refund: booking.breakdown.dueNow, forfeited: 0, free: true }
+    : refundFor(booking.breakdown, charter?.policies.freeCancellationDaysInAdvance ?? 0, daysUntil);
+
+  booking.status = 'cancelled';
+  booking.cancelledAt = new Date().toISOString();
+  booking.cancellationReason = reason;
+  booking.refundAmount = outcome.refund;
+
+  releaseDates(db, booking.id);
+  refundCredit(db, booking);
+
+  // Any payout scheduled against this booking is withdrawn.
+  db.payouts = db.payouts.filter((p) => !(p.bookingId === booking.id && p.status === 'pending'));
+
+  notify(db, isCustomer ? booking.ownerId : booking.customerId, {
+    kind: 'booking',
+    title: 'Booking cancelled',
+    body: `${booking.reference} on ${booking.date} was cancelled.`,
+    href: isCustomer ? `/owner/bookings/${booking.id}` : `/account/bookings/${booking.id}`,
+  });
+
+  return { booking, ...outcome };
+}
+
+/**
+ * Advance bookings whose trip date has passed. Idempotent, so it can run on
+ * every request without double-counting completed trips.
+ */
+export function settleElapsedBookings(db: Database): number {
+  const now = new Date().toISOString();
+  const cutoff = today();
+  let changed = 0;
+
+  for (const booking of db.bookings) {
+    if (booking.status === 'confirmed' && booking.date < cutoff) {
+      booking.status = 'completed';
+      changed += 1;
+
+      const customer = db.users.find((u) => u.id === booking.customerId);
+      if (customer) customer.completedTrips += 1;
+
+      const payout = db.payouts.find((p) => p.bookingId === booking.id);
+      if (payout && payout.status === 'pending') {
+        payout.status = 'paid';
+        payout.paidAt = now;
+      }
+    }
+
+    // A request the owner never answered releases its hold.
+    if (booking.status === 'pending' && booking.respondByAt && booking.respondByAt < now) {
+      booking.status = 'expired';
+      releaseDates(db, booking.id);
+      refundCredit(db, booking);
+      changed += 1;
+    }
+  }
+
+  return changed;
+}
+
+function schedulePayout(db: Database, booking: Booking): void {
+  if (db.payouts.some((p) => p.bookingId === booking.id)) return;
+
+  const gross = booking.breakdown.total;
+  const platformFee = roundMoney(gross * commerceConfig.serviceFeeRate, booking.currency);
+
+  db.payouts.push({
+    id: newId(),
+    ownerId: booking.ownerId,
+    bookingId: booking.id,
+    gross,
+    platformFee,
+    net: roundMoney(gross - platformFee, booking.currency),
+    currency: booking.currency,
+    status: 'pending',
+    scheduledFor: addDays(booking.date, 2),
+  });
+}
+
+/** Return credit spent on a booking that never happened. */
+function refundCredit(db: Database, booking: Booking): void {
+  const creditLine = booking.breakdown.lines.find((l) => l.key === 'credit');
+  if (!creditLine) return;
+
+  const customer = db.users.find((u) => u.id === booking.customerId);
+  if (customer) {
+    customer.creditBalance = roundMoney(customer.creditBalance + Math.abs(creditLine.amount));
+  }
+}
+
+function requireBooking(db: Database, bookingId: string): Booking {
+  const booking = db.bookings.find((b) => b.id === bookingId);
+  if (!booking) throw new BookingError('not_found', 'Booking not found');
+  return booking;
+}
+
+export function notify(
+  db: Database,
+  userId: string,
+  input: { kind: 'booking' | 'message' | 'review' | 'payout' | 'system'; title: string; body: string; href?: string },
+): void {
+  db.notifications.push({
+    id: newId(),
+    userId,
+    kind: input.kind,
+    title: input.title,
+    body: input.body,
+    href: input.href,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+/** Booking with everything the detail screens render, resolved in one pass. */
+export function expandBooking(db: Database, booking: Booking) {
+  const charter = db.charters.find((c) => c.id === booking.charterId);
+  const pkg = db.packages.find((p) => p.id === booking.packageId);
+  const destination = charter ? db.destinations.find((d) => d.id === charter.destinationId) : undefined;
+  const owner = db.users.find((u) => u.id === booking.ownerId);
+  const customer = db.users.find((u) => u.id === booking.customerId);
+  const thread = db.threads.find((t) => t.bookingId === booking.id);
+  const review = booking.reviewId ? db.reviews.find((r) => r.id === booking.reviewId) : undefined;
+
+  const daysUntil = daysBetween(today(), booking.date);
+  const freeDays = charter?.policies.freeCancellationDaysInAdvance ?? 0;
+
+  return {
+    ...booking,
+    charter: charter
+      ? {
+          id: charter.id,
+          title: charter.title,
+          photo: charter.photos[0]
+            ? { placeholder: charter.photos[0].placeholder, altText: charter.photos[0].altText }
+            : null,
+          destinationTitle: destination?.title ?? '',
+          address: charter.address,
+          directions: charter.directions,
+          geoPoint: charter.geoPoint,
+          timezone: charter.timezone,
+          policies: charter.policies,
+        }
+      : null,
+    package: pkg
+      ? { id: pkg.id, title: pkg.title, hours: pkg.hours, type: pkg.type, capacity: pkg.capacity }
+      : null,
+    owner: owner
+      ? {
+          id: owner.id,
+          displayName: owner.ownerProfile?.captainName ?? `${owner.firstName} ${owner.lastName}`,
+          companyName: owner.ownerProfile?.companyName ?? '',
+          // Contact details are released only once a trip is actually on.
+          phone: booking.status === 'confirmed' || booking.status === 'completed' ? owner.phone : undefined,
+        }
+      : null,
+    customer: customer
+      ? {
+          id: customer.id,
+          displayName: `${customer.firstName} ${customer.lastName}`,
+          email: customer.email,
+          phone: customer.phone,
+        }
+      : null,
+    threadId: thread?.id,
+    review: review ? { id: review.id, rating: review.rating, headline: review.headline } : null,
+    daysUntilTrip: daysUntil,
+    canCancel: booking.status === 'pending' || booking.status === 'confirmed',
+    freeCancellationUntil: freeDays > 0 ? addDays(booking.date, -freeDays) : null,
+    isFreeCancellation: freeDays > 0 && daysUntil >= freeDays,
+    canReview: booking.status === 'completed' && !booking.reviewId,
+  };
+}
+
+export type ExpandedBooking = ReturnType<typeof expandBooking>;

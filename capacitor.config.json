@@ -1,0 +1,33 @@
+{
+  "appId": "com.boatbooker.app",
+  "appName": "BoatBooker",
+  "webDir": "public",
+  "server": {
+    "url": "http://10.0.2.2:3000",
+    "cleartext": true,
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#ffffff"
+  },
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#ffffff"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 800,
+      "backgroundColor": "#1d70f1",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DEFAULT",
+      "backgroundColor": "#ffffff"
+    },
+    "Geolocation": {
+      "permissions": ["location"]
+    }
+  }
+}
