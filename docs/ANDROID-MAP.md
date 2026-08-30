@@ -31,16 +31,17 @@ defensible web architecture but is not how the mobile product is packaged.
 | Token | Real app | This rebuild |
 | --- | --- | --- |
 | Header / chrome | Solid blue, white text | Blue, matches |
-| **Primary CTA (guest app)** | **Orange** | Blue — **diverges** |
+| **Primary CTA (guest app)** | **Orange** | Orange, matches |
 | Primary CTA (owner app) | Blue | Blue, matches |
-| Price | **Green**, bold | Ink — diverges |
-| "Instant confirmation" | Green text + green check | Blue badge — diverges |
-| Scarcity | Red + flame glyph | Not surfaced |
+| Price | **Green**, bold | Green, matches |
+| "Instant confirmation" | Green text + green check | Green text + check, matches |
+| Scarcity | Red + flame glyph | Red line, shown from 3 bookings in 7 days |
 | Guest logo | Leaf/wave mark, "Boat Booker" stacked | Anchor — diverges |
 | Owner icon | Anchor with an F crossbar, blue gradient | Anchor — close |
 
-The orange primary action on the guest app is the single most visible
-difference. The owner app uses blue, so the split is per-app, not global.
+The split is per-app, not global, so it is a `--cta` variable the shell sets:
+the guest shells carry `data-app="guest"` and every `variant="primary"` follows
+it. See `globals.css` and `components/ui/primitives.tsx`.
 
 ## Guest app
 
@@ -51,7 +52,8 @@ full-width **orange Search** button. Below: an **"Explore nearby"** module —
 an actual map with pins and a "View map" button — then "Exciting nearby…"
 destinations.
 
-> We have the search card and destination rails, but no map module on home.
+> We have the search card and destination rails, but no map module on home —
+> the schematic map lives on search, not home.
 
 ### Search results
 - App bar: back chevron, destination as title (`Miami`), criteria as subtitle
@@ -63,8 +65,9 @@ destinations.
   bottom right.
 - Photos carrying video get a **blue circular play badge**.
 
-> Ours are vertical cards with a badge row (Boaters' Choice, In demand, checks).
-> The real card is markedly cleaner and carries no award badges.
+> Matched: the phone card is horizontal, price green, instant confirmation a
+> green check, and the award badges and spec row are hidden below `sm`. A cover
+> carrying video shows the play badge and its length.
 
 ### Listing detail
 App bar: back, truncated title, heart, share. Full-bleed hero photo. White
@@ -140,22 +143,26 @@ requests appear as the first message, prefixed `Special requests:`.
 
 Ranked by how visible each is to a user.
 
-| # | Real app | This rebuild |
-| --- | --- | --- |
-| 1 | Orange primary CTA in the guest app | Blue |
-| 2 | Horizontal search cards, photo left | Vertical, photo on top |
-| 3 | Prices green; instant confirmation green text | Ink; blue badge |
-| 4 | Video on listings, play badge on cards | No video at all |
-| 5 | Filter · Sort · Map three-up toolbar | Filter/Map chips + sort dropdown |
-| 6 | Real Google Maps | Schematic SVG map |
-| 7 | Red scarcity line on listings | Not surfaced |
-| 8 | Owner bookings: 2 tabs | 5 tabs |
-| 9 | Status as green section-header strip | Inline pill badge |
-| 10 | Owner calendar: scrolling month, selection mode, Sunday start | Listing × day matrix, Monday start |
-| 11 | Quick Replies, delivery receipts, avatars, system rows in threads | None of these |
-| 12 | Minimal owner listings screen | Dense with metrics |
-| 13 | Guest shown as `Kevin S.` | Full name |
-| 14 | Two separate apps | One app, role-routed |
+Rows 1–13 have been closed. Rows 14–16 remain, and why is given below.
+
+| # | Real app | This rebuild | State |
+| --- | --- | --- | --- |
+| 1 | Orange primary CTA in the guest app | Orange, blue in the operator app | closed |
+| 2 | Horizontal search cards, photo left | Horizontal on phones, vertical from `sm` | closed |
+| 3 | Prices green; instant confirmation green text | Green price, green check | closed |
+| 4 | Video on listings, play badge on cards | Play badge and clip length; player when a file exists | closed |
+| 5 | Filter · Sort · Map three-up toolbar | Three-up sticky toolbar, sort in a sheet | closed |
+| 6 | Red scarcity line on listings | Counted from real bookings, hidden below 3 | closed |
+| 7 | Owner bookings: 2 tabs | 2 tabs | closed |
+| 8 | Status as green section-header strip | Full-width header strip | closed |
+| 9 | Owner calendar: scrolling month, selection mode, Sunday start | Same, with a contextual app bar | closed |
+| 10 | Quick Replies, delivery receipts, avatars, system rows in threads | All four | closed |
+| 11 | Minimal owner listings screen | Minimal on phones, detail from `sm` | closed |
+| 12 | Guest shown as `Kevin S.` | `Kevin S.` | closed |
+| 13 | Bottom tab bar is the only navigation on a phone | Sidebar is desktop-only; Menu/Profile tabs carry the rest | closed |
+| 14 | Real Google Maps | Schematic SVG map | **open** — a map key cannot be committed, and tiles would not load offline |
+| 15 | Real photography and video | Deterministic gradients, poster + play badge | **open** — no media to serve; the model carries the fields a deployment would fill |
+| 16 | Two separate apps | One app, role-routed | **open** — a deliberate web architecture, not an oversight |
 
 ## Still unmapped visually
 

@@ -19,7 +19,11 @@
                        │
   ┌────────────────────┴─────────────────────────────────┐
   │  lib/services/   pricing · availability · bookings ·   │
-  │                  search · messages · reviews ·         │
+  │                  changes · cancellation · offers ·     │
+  │                  payments · moderation · verification ·│
+  │                  search · messages · reviews · deals · │
+  │                  itineraries · opportunities · direct ·│
+  │                  performance · memories · notifications│
   │                  accounts · owner · charters           │
   └────────────────────┬─────────────────────────────────┘
                        │
@@ -88,18 +92,51 @@ already booked, and the group fits. Every surface that asks "can I book this?"
 resolves through here, so search, the listing page and checkout cannot
 disagree.
 
-**`bookings.ts`** — the lifecycle:
+**`bookings.ts`** — the lifecycle, eleven states:
 
 ```
-pending ──accept──▶ confirmed ──trip date passes──▶ completed
-   │                    │
-   ├──decline──▶ declined   └──cancel──▶ cancelled
-   └──window elapses──▶ expired
+request ─▶ pending ──accept──▶ confirmed ──trip date passes──▶ done
+              │                    │
+              ├─decline─▶ declined │─request_change─▶ change_requested
+              │                    │                      │
+              └─window elapses─▶ withdrawn               ├─accept, same price─▶ confirmed
+                                                         ├─accept, price moves─▶ change_pending
+                                   │                     └─decline/withdraw──▶ confirmed
+                                   └─cancel_requested ─▶ cancelled
 ```
 
 Every transition that frees a date releases the calendar block; every one that
 takes a date reserves it. A *pending* request holds the date too — otherwise an
-owner could accept a request for a day sold underneath them.
+owner could accept a request for a day sold underneath them. A change holds the
+**original** dates until the new ones are secured, so a guest whose change is
+declined still has their trip.
+
+**`changes.ts`** — the bilateral change flow. Its one subtle rule: the price
+impact of a change is the difference between two runs of the pricing engine, not
+between a fresh run and the booking's stored total. The stored total carries the
+loyalty discount, credit, promo and add-ons that applied at checkout, and none of
+those are inputs to a re-price — comparing across that gap made every change look
+like a price change to any guest with a loyalty tier.
+
+**`cancellation.ts`** — a 22-reason taxonomy, and `assessCancellation()` (pure)
+kept separate from `applyPenalties()` (mutating) so the preview a guest sees
+cannot accidentally cancel anything.
+
+**`offers.ts`** — priced invitations built from a thread, valid 48 hours. An
+outstanding offer deliberately **does not hold the date**; availability is
+re-checked at acceptance, because an offer that reserved inventory would let one
+operator freeze a date by sending offers nobody accepts.
+
+**`moderation.ts`** — two different mechanisms that are easy to confuse.
+Stripping contact details is a *delay*, released once a booking is confirmed.
+Blocking off-platform payment is a *wall*, at every stage.
+
+**`verification.ts`** — phone codes: six digits, ten-minute life, a 60-second
+resend cooldown measured from the last code sent (so a restart cannot reset
+someone's rate limit), five guesses before the code is burnt.
+
+**`deals.ts`** — campaign pages built on top of `search()` rather than beside
+it, so a deal card cannot price differently from the same boat in search.
 
 **`search.ts`** — parse → filter → sort → page → facet. Facet counts use the
 "all filters except this one" rule, which is what stops a user ticking a box,
@@ -174,3 +211,6 @@ being re-exported from `primitives.tsx`.
 | Move to a real database | New `StorageAdapter`, wire it in `storage/index.ts` |
 | Add a static page | Append to `content/pages.ts` |
 | Add a currency | `config/locale.ts` |
+| Add a deal campaign | `config/campaigns.ts` — the route already renders it |
+| Change the guest CTA colour | `--cta` in `app/globals.css`; shells set `data-app` |
+| Add a notification | `services/notificationCatalogue.ts` |

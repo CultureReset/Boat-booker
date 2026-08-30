@@ -868,38 +868,47 @@ booking accept/decline/cancel · calendar · messaging · reviews · wishlist ·
 payouts · team · verification · loyalty · referrals · notifications · owner
 dashboard · listing editor · SEO index pages · widgets.
 
-### Present in the real product, absent here
+### Built since this map was written
 
-Ordered by how much of the product experience they carry.
+All 26 gaps below have been closed except the last, which is deliberate.
+Each row names the route the rebuild serves it on and the service that owns
+the rules, so the claim can be checked rather than taken.
 
-| # | Feature | Route(s) | Notes |
+| # | Feature | Route(s) here | Service |
 | --- | --- | --- | --- |
-| 1 | **Custom offers** | `/offer/create`, `inbox` | Operator builds a priced offer from a thread, with an expiry window. Central to how inquiries convert. |
-| 2 | **Booking change requests** | `/manage/booking/change-requested/*` | 3-step flow, bilateral, expiring, with a price-change escalation path |
-| 3 | **Cancellation penalty engine** | `cancelBooking` | Graded ranking impact, Instant Book strikes, automatic public cancellation reviews |
-| 4 | **Account-health throttling** | `prompts` | Booking caps and listing pauses driven by realization rate, bypass attempts, malfunctions |
-| 5 | **Online tipping** | `/pay/tip` | 5–50%, with a cash-preferred opt-out |
-| 6 | **Pay-balance-later** | `/pay/balance` | Standalone link, plus scheduled auto-pay |
-| 7 | **Trip itinerary builder** | `/manage/itinerary/…` | Per-day ordered steps, publish gate, draft lifecycle |
-| 8 | **Opportunities engine** | `opportunities` | ~30 scored, categorised listing improvements |
-| 9 | **BoatBooker Direct** | `/direct`, `/manage/direct/*` | Zero-commission channel, QR + link + manual bookings |
-| 10 | **Quick Replies** | `quickReplies` | Templated replies with variable interpolation |
-| 11 | **Trip memories** | `/trip-memory/[id]` | Animated 7-scene recap with a rebooking offer |
-| 12 | **Anti-bypass enforcement** | `inbox` | Contact stripping, message blocking, fraud banners, reporting |
-| 13 | **Performance analytics** | `/manage/performance/*` | YoY metrics, conversion, realization, response |
-| 14 | **Calendar sync + linking** | `calendar`, `/opportunity-link-calendars` | Google/iCloud import, cross-listing blocking |
-| 15 | **Push notifications** | `push` | 56 typed notifications across 3 channels |
-| 16 | **Listing add-ons** | `/manage/add-ons/[listingId]` | Paid extras |
-| 17 | **Shared wishlists** | `/shared-wishlist` | |
-| 18 | **Buddy invitations** | `/manage/booking/[id]/buddy_invitation` | |
-| 19 | **QR review collection** | `/reviews/scan-qr-code/[id]` | |
-| 20 | **Catches feed** | `/catches` | Social feed with month/season filters |
-| 21 | **Deals pages** | `/deals/[[...slug]]` | Seasonal campaigns |
-| 22 | **Public profiles** | `/profile/view/[userId]` | |
-| 23 | **Async payment states** | `/booking/processing`, `/booking/failed` | Payment provider is asynchronous |
-| 24 | **Phone OTP registration** | `/finish-registration/*` | SMS verification with resend timer |
-| 25 | **Apple Pay / PayPal** | `bookingFlow` | Only card is modelled here |
-| 26 | **Internal admin** | `/manage/admin-home` + 4 | Out of scope for a rebuild |
+| 1 | **Custom offers** | `/offer/create`, `/account/inbox/[id]` | `services/offers.ts` |
+| 2 | **Booking change requests** | `/account/bookings/[id]/change` | `services/changes.ts` |
+| 3 | **Cancellation penalty engine** | `/account/bookings/[id]/cancel` | `services/cancellation.ts` |
+| 4 | **Account-health throttling** | — (enforced at booking) | `services/cancellation.ts` |
+| 5 | **Online tipping** | `/pay/tip` | `services/payments.ts` |
+| 6 | **Pay-balance-later** | `/pay/balance` | `services/payments.ts` |
+| 7 | **Trip itinerary builder** | `/owner/listings/[id]/itineraries` | `services/itineraries.ts` |
+| 8 | **Opportunities engine** | `/owner/opportunities` | `services/opportunities.ts` |
+| 9 | **BoatBooker Direct** | `/owner/direct`, `/direct` | `services/direct.ts` |
+| 10 | **Quick Replies** | `/owner/quick-replies` | `services/direct.ts` |
+| 11 | **Trip memories** | `/trip-memories`, `/trip-memory/[id]` | `services/memories.ts` |
+| 12 | **Anti-bypass enforcement** | `/account/inbox/[id]` | `services/moderation.ts` |
+| 13 | **Performance analytics** | `/owner/performance` | `services/performance.ts` |
+| 14 | **Calendar sync + linking** | `/owner/calendar/links` | `services/availability.ts` |
+| 15 | **Push notifications** | `/account/notifications` | `services/notificationCatalogue.ts` |
+| 16 | **Listing add-ons** | `/owner/listings/[id]/add-ons` | `services/charters.ts` |
+| 17 | **Shared wishlists** | `/shared-wishlist` | `services/memories.ts` |
+| 18 | **Buddy invitations** | `/manage/booking/[id]/buddy_invitation` | `services/memories.ts` |
+| 19 | **QR review collection** | `/reviews/scan-qr-code/[id]` | `services/direct.ts` |
+| 20 | **Catches feed** | `/catches` | seeded, `services/memories.ts` |
+| 21 | **Deals pages** | `/deals/[[...slug]]` | `services/deals.ts`, `config/campaigns.ts` |
+| 22 | **Public profiles** | `/profile/view/[userId]` | `services/memories.ts` |
+| 23 | **Async payment states** | `/booking/processing`, `/booking/failed` | `services/payments.ts` |
+| 24 | **Phone OTP registration** | `/finish-registration` | `services/verification.ts` |
+| 25 | **Apple Pay / PayPal** | `/account/payment-methods` | `services/accounts.ts` |
+| 26 | **Internal admin** | **not built** | Out of scope for a rebuild |
+
+**Still absent, on purpose.** Internal admin (row 26) is staff tooling, not
+product. Real Google Maps is replaced by a schematic SVG, because a map key
+cannot be committed and the tiles would not load offline. Media — photos and
+video alike — is represented by deterministic gradients and a poster/badge,
+because there is no bitmap or clip to serve; the *model* carries the fields a
+real deployment would fill.
 
 ### Modelled differently
 

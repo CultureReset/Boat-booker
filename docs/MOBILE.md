@@ -9,14 +9,33 @@ same origin.
 Every screen is built mobile-first and the layout is genuinely responsive, not
 a desktop page squeezed down:
 
-- A bottom tab bar (`components/shell/TabBar.tsx`) is the primary navigation
-  below `md`; the header takes over above it. Tabs differ by role — an owner
-  gets Calendar and Bookings where a guest gets Wishlist and Bookings.
+- A bottom tab bar (`components/shell/TabBar.tsx`) is the **only** navigation
+  below `md`; the header and sidebar take over above it. Tabs differ by role —
+  an owner gets Home, Calendar, Bookings, Inbox, Menu; a guest gets Home,
+  Wishlist, Bookings, Inbox, Profile.
+- Everything that is not a tab hangs off a **menu screen** — `/owner/menu` and
+  `/account/menu` — the way both real apps do it. The dashboard sidebar
+  (`DashboardNav`) is deliberately desktop-only: rendering it on a phone put a
+  second copy of Bookings and Inbox directly above a tab bar that already had
+  them. Anything added to that sidebar must also appear on a menu screen, or it
+  is unreachable on a phone.
+- The tab bar's active state resolves once for the whole bar rather than per
+  tab: section roots match exactly (`/owner` is a prefix of every owner route),
+  and the Menu tab claims whatever no other tab matched, so a screen pushed
+  from the menu keeps Menu lit.
+- The guest app's primary action is orange and the operator app's is blue.
+  That is a `--cta` variable set by the shell (`data-app="guest"`), so no button
+  chooses and none can drift.
 - Pickers (destination, date, guests, filters) open as full bottom sheets on
   mobile and inline or as dialogs on desktop. One `Overlay` component does both.
 - The listing page's booking panel is a sticky sidebar on desktop and a fixed
   bottom bar that expands into a sheet on mobile. The tab bar hides itself on
-  those screens so two fixed bars never stack.
+  those screens so two fixed bars never stack. A message thread does the same
+  and goes full-bleed, so its composer sits on the bottom edge rather than
+  floating above the shell's gutter.
+- The operator calendar is two components chosen by viewport, not one squeezed:
+  a vertically scrolling month view with a contextual app bar on phones, and the
+  listing × day matrix on desktop. Shift-click ranges need a mouse.
 - Touch targets are 44px minimum; inputs are 16px on mobile so iOS Safari does
   not zoom on focus.
 - `env(safe-area-inset-*)` is respected via the `safe-top` / `safe-bottom`
@@ -39,6 +58,19 @@ a desktop page squeezed down:
 
 Installing from Chrome on Android gives a standalone app with the tab bar,
 splash screen and app icon. That is the fastest route to "the mobile app".
+
+## Verifying the mobile UI
+
+The layout bugs that matter are not caught by a type checker or a build. They
+are caught by looking. `scripts/` has no browser dependency, so the tour lives
+outside the repo: a headless Chromium at a Pixel-7 viewport (412×915 @2x) with
+an Android user agent, walking all 49 screens signed in as each demo account,
+reporting HTTP status and console errors, and writing a screenshot per screen.
+
+Reading those screenshots is what found the dashboard collapsing on mobile, two
+production-only 500s, a `%date%` placeholder rendered raw, a payout table that
+only scrolled sideways, and four screens printing their heading twice. None of
+them failed a build.
 
 ## Native wrapper (Capacitor)
 

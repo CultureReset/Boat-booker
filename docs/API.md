@@ -164,11 +164,24 @@ Accepts an ID or a booking reference. Visible only to the guest and the owner.
 
 ### `POST /api/bookings/:id` — auth
 ```jsonc
-{ "action": "accept" | "decline" | "cancel", "reason?" }
+{ "action": "accept" | "decline" | "cancel" | "preview_cancel"
+          | "request_change" | "accept_change" | "decline_change" | "withdraw_change",
+  "reason?", "note?", "requested?", "changeRequestId?" }
 ```
 `accept`/`decline` are owner-only. `cancel` works for either party — an owner
-cancelling is always a full refund. The response carries `refund`, `forfeited`
-and `free`.
+cancelling is always a full refund. `reason` is a key from the 22-reason
+taxonomy, and the response carries `refund`, `forfeited`, `free`, the
+`penalties` applied and the ranking `impact`.
+
+`preview_cancel` returns the same assessment **without mutating anything** — it
+is what the cancel screen shows before the guest has decided.
+
+`request_change` takes `requested` (`date`, `departureTime`, `adults`,
+`children`, `days`, `packageId`) and holds the original dates until the new ones
+are secured. The other party answers with `accept_change` or `decline_change`;
+the requester withdraws with `withdraw_change`. A change that moves the price
+goes to `manual_review` and the booking waits in `change_pending` — money
+moving is not applied on a tap.
 
 ---
 
@@ -199,11 +212,39 @@ anything else is rejected rather than clamped, so a broken client cannot skew
 aggregates quietly.
 
 ### `GET|POST|PATCH|DELETE /api/cards` — auth
-The full number is validated (Luhn + expiry) and discarded; only brand and last
-four are stored. `PATCH { cardId }` promotes to default.
+Cards and wallets in one list. `POST { kind: "card" }` validates the number
+(Luhn + expiry) and discards it, keeping only the brand and last four;
+`POST { kind: "paypal" | "apple_pay", accountLabel }` stores only the linked
+account. One wallet per kind — re-linking updates the existing one.
+`PATCH { methodId }` promotes to default; removing the default promotes
+another.
 
 ### `GET|POST /api/notifications` — auth
 `POST { id }` or `{ all: true }` marks read.
+
+### `POST /api/auth/phone` — auth · `GET /api/auth/phone` — auth
+`GET` reports the number, whether it is verified, and the seconds left on the
+resend cooldown, so a reloaded screen resumes its countdown.
+`POST { action: "send", phone }` issues a six-digit code with a 60-second
+cooldown and a ten-minute life; `POST { action: "verify", code }` answers it,
+burning the code after five wrong guesses. The code is returned in the response
+only while `AUTH_EXPOSE_MAGIC_LINK` is on — it must be `false` in production.
+
+### `GET|POST|PATCH /api/offers` — auth
+`GET` lists offers involving the caller, scoped by session rather than a
+parameter. `POST` (owner) builds a priced invitation from a thread; one
+outstanding offer per thread. An offer **does not hold the date** — availability
+is re-checked at acceptance. `PATCH { offerId, action }` withdraws it, or
+answers an inquiry with `pre_approve` / `decline`.
+
+### `POST /api/payments`
+`request_link` mints a 72-hour balance link; `pay_balance` spends one **without
+a session**, since the link carries the authority; `tip` posts a tip priced off
+the original trip price as its own non-commissionable payout; `schedule` picks
+how the balance is collected.
+
+### `POST /api/social` — auth
+`share_wishlist` / `revoke_wishlist` / `invite_buddies`.
 
 ---
 
@@ -223,6 +264,11 @@ All **owner**. Ownership is verified in the service layer on every call.
 | `GET|POST|DELETE /api/owner/team` | Team members. The account owner cannot be removed |
 | `GET|POST /api/owner/verification` | Documents and status |
 | `PATCH /api/owner/settings` | Business profile, online payments |
+| `GET|POST /api/owner/listings/:id/itineraries` | Per-trip day-by-day plans. `save` writes a draft; `publish` is separate and gated on two steps per day |
+| `GET|POST /api/owner/listings/:id/add-ons` | Paid extras, per person or per booking |
+| `GET|POST /api/owner/quick-replies` | Templated replies with `%placeholder%` interpolation |
+| `GET|POST|DELETE /api/owner/calendars` | External calendar feeds and cross-listing links |
+| `POST /api/owner/direct` | Enable/disable Direct, mint invites, take manual bookings, request QR reviews |
 
 ## Health
 
