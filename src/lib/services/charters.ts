@@ -92,7 +92,13 @@ export interface CharterCard {
   title: string;
   listingType: string;
   destination: { id: string; slug: string; title: string; stateAbbrev?: string; countryTitle: string };
-  photo: { placeholder: string; altText: string; url: string };
+  photo: {
+    placeholder: string;
+    altText: string;
+    url: string;
+    /** Set when the cover is a clip — the card shows a play badge. */
+    video?: { url?: string; durationSeconds: number };
+  };
   photoCount: number;
   boatType: string;
   boatCategory: string;
@@ -146,7 +152,7 @@ export function buildCharterCard(input: {
       countryTitle: input.countryTitle,
     },
     photo: cover
-      ? { placeholder: cover.placeholder, altText: cover.altText, url: cover.url }
+      ? { placeholder: cover.placeholder, altText: cover.altText, url: cover.url, video: cover.video }
       : { placeholder: 'linear-gradient(160deg,#cbd5e1,#94a3b8)', altText: charter.title, url: '' },
     photoCount: charter.photos.length,
     boatType: charter.boat.type,
@@ -249,7 +255,13 @@ export interface CharterDetail extends Omit<CharterCard, 'photo'> {
   /** Only populated for a guest with a confirmed booking. */
   exactAddress: string | null;
   approximateAddress: string;
-  photos: { id: string; placeholder: string; altText: string; url: string }[];
+  photos: {
+    id: string;
+    placeholder: string;
+    altText: string;
+    url: string;
+    video?: { url?: string; durationSeconds: number };
+  }[];
   boat: Charter['boat'];
   policies: Charter['policies'];
   amenitySections: AmenitySection[];
@@ -346,6 +358,7 @@ export function buildCharterDetail(input: {
       placeholder: p.placeholder,
       altText: p.altText,
       url: p.url,
+      video: p.video,
     })),
     boat: { ...charter.boat, category: boatType?.category ?? charter.boat.category },
     policies: charter.policies,

@@ -101,5 +101,9 @@ export default async function PayBalancePage({
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto w-full max-w-lg px-4 py-6">{children}</div>;
+  return (
+    <div data-app="guest" className="mx-auto w-full max-w-lg px-4 py-6">
+      {children}
+    </div>
+  );
 }

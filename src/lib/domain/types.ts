@@ -162,6 +162,15 @@ export interface Photo {
   width: number;
   height: number;
   cardinal: number;
+  /**
+   * Present when this asset is a video rather than a still.
+   *
+   * `url` and `placeholder` above are then the poster frame, and `video.url` is
+   * the file — absent in fixtures for the same reason photo URLs are: there is
+   * no media to serve, and the gradient stands in. What the flag drives either
+   * way is the play badge, which is what the real cards show.
+   */
+  video?: { url?: string; durationSeconds: number };
 }
 
 export interface GeoPoint {

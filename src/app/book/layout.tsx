@@ -9,7 +9,7 @@ import { Header } from '@/components/shell/Header';
  */
 export default function BookingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-surface-sunken">
+    <div data-app="guest" className="flex min-h-dvh flex-col bg-surface-sunken">
       <Header />
       <main id="main" className="flex-1">
         {children}

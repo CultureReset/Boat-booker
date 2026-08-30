@@ -11,7 +11,7 @@ import { TabBar, TabBarSpacer } from '@/components/shell/TabBar';
  */
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div data-app="guest" className="flex min-h-dvh flex-col">
       <Header />
       <main id="main" className="flex-1">
         {children}

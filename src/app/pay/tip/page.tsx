@@ -32,7 +32,7 @@ export default async function TipPage({
   try {
     const context = tipContext(db, bookingId, user.id);
     return (
-      <div className="mx-auto w-full max-w-lg px-4 py-6">
+      <div data-app="guest" className="mx-auto w-full max-w-lg px-4 py-6">
         <TipFlow
           data={{
             bookingId: context.booking.id,

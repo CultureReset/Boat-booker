@@ -230,6 +230,8 @@ export function Header({ variant = 'default' }: { variant?: 'default' | 'transpa
       <Overlay open={menuOpen} onClose={() => setMenuOpen(false)} title={brand.name} size="full">
         <nav className="flex flex-col divide-y divide-line" aria-label="Mobile">
           <SheetLink href="/pages/whylist" icon="boat">{t('navigation', 'getListed')}</SheetLink>
+          <SheetLink href="/deals" icon="tag">{t('deals', 'indexTitle')}</SheetLink>
+          <SheetLink href="/catches" icon="camera">{t('catches', 'title')}</SheetLink>
           <SheetLink href="/activity" icon="grid">{t('navigation', 'activity')}</SheetLink>
           <SheetLink href="/boat-type" icon="boat">{t('navigation', 'boatType')}</SheetLink>
           <SheetLink href="/boating-near-me" icon="map-pin">{t('navigation', 'boatingNearMe')}</SheetLink>

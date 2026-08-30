@@ -101,11 +101,25 @@ const MESSAGE_SNIPPETS = [
   'Not at all, I will let the kitchen know when I confirm the booking.',
 ];
 
+/**
+ * How many listings carry a walkaround video.
+ *
+ * BoatBooker runs a free-video programme rather than shooting every boat, so
+ * this is a minority of listings — enough that both the card with a play badge
+ * and the card without are exercised.
+ */
+const VIDEO_SHARE = 0.22;
+
 function buildPhoto(rng: Rng, charterKey: string, index: number, altText: string): Photo {
   // Photos are represented as deterministic gradients rather than remote
   // bitmaps so the demo has no external image dependency and renders offline.
   const hue = (rng.int(180, 230) + index * 9) % 360;
   const hue2 = (hue + rng.int(20, 60)) % 360;
+
+  // Only the cover can be a video: that is the frame the search card shows, and
+  // it is where the real app puts the play badge.
+  const isVideo = index === 0 && rng.bool(VIDEO_SHARE);
+
   return {
     id: `${charterKey}_p${index}`,
     url: '',
@@ -114,6 +128,9 @@ function buildPhoto(rng: Rng, charterKey: string, index: number, altText: string
     width: 1600,
     height: 1067,
     cardinal: index,
+    // No `url`: there is no file to serve here, the same as the stills. The
+    // poster gradient stands in and the badge is what the flag drives.
+    video: isVideo ? { durationSeconds: rng.int(28, 95) } : undefined,
   };
 }
 

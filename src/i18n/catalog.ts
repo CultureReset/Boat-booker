@@ -1744,6 +1744,17 @@ export const catalog = {
     instantBookBody: 'Let guests book without waiting for you to confirm.',
   },
 
+  deals: {
+    indexTitle: 'Deals',
+    indexSubtitle: 'Seasonal offers and the boats guests rate highest.',
+    liveNow: 'Running now',
+    outOfSeason: 'Out of season',
+    seeDeals: 'See deals',
+    matchCount: '{0}No boats|{1}1 boat|[2,Inf]%count% boats',
+    emptyTitle: 'Nothing on this deal right now',
+    emptyBody: 'Inventory changes daily — try a full search, or come back when the campaign runs.',
+  },
+
   destinations: {
     title: 'Destinations',
     countriesTitle: 'Countries',

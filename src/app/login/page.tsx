@@ -34,7 +34,7 @@ export default async function LoginPage({
   if (user) redirect(next);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-surface-sunken">
+    <div data-app="guest" className="flex min-h-dvh flex-col bg-surface-sunken">
       <header className="border-b border-line bg-white">
         <div className="mx-auto flex h-14 max-w-shell items-center px-4">
           <Link href="/" className="flex items-center gap-2">

@@ -18,18 +18,24 @@ import { cx } from './cx';
 // --- Button ----------------------------------------------------------------
 
 /**
- * `accent` is the guest app's primary action.
+ * `primary` resolves through `--cta`, which the shell sets.
  *
- * The real product uses blue chrome with an orange call to action on the
- * customer side, and blue on both in the operator app — so "the primary
- * button" is not one colour, and the two need separate names rather than one
- * that means different things depending on where you are.
+ * The real product uses blue chrome with an orange call to action on the guest
+ * side and blue on both in the operator app, so "the primary button" is not one
+ * colour — it depends on which app you are in. Rather than make every call site
+ * choose, the guest shells set `data-app="guest"` and the variable follows;
+ * see globals.css.
+ *
+ * `accent` names the orange explicitly, for the few places that want it
+ * regardless of app — an operator's offer card, which is the guest's CTA
+ * rendered inside the operator's inbox.
  */
 type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'ghost' | 'danger' | 'outline';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800 disabled:bg-brand-300',
+  primary:
+    'bg-[var(--cta)] text-white hover:bg-[var(--cta-hover)] active:bg-[var(--cta-active)] disabled:bg-[var(--cta-disabled)]',
   accent: 'bg-accent text-white hover:bg-accent-600 active:bg-accent-700 disabled:bg-accent-300',
   secondary: 'bg-ink text-white hover:bg-slate-800 active:bg-slate-900 disabled:bg-slate-400',
   outline: 'border border-line bg-white text-ink hover:bg-surface-sunken active:bg-slate-100 disabled:text-ink-faint',
@@ -505,17 +511,33 @@ export function RatingSummary({
  * every card renders instantly and works offline. Point `url` at a real image
  * and this becomes an ordinary `<img>` with the gradient as the loading state.
  */
+/**
+ * @param photo `video` marks the asset as a clip: the frame then carries the
+ *   blue circular play badge the real cards show, and its duration. Handling it
+ *   here rather than at each call site means the search card, the gallery and
+ *   the thumbnails cannot disagree about what a video looks like.
+ */
 export function PhotoFrame({
   photo,
   className,
   rounded = 'rounded-card',
+  badgeSize = 'md',
   children,
 }: {
-  photo: { url?: string; placeholder: string; altText: string } | null;
+  photo: {
+    url?: string;
+    placeholder: string;
+    altText: string;
+    video?: { url?: string; durationSeconds: number };
+  } | null;
   className?: string;
   rounded?: string;
+  /** `sm` for thumbnails, where the full badge would cover the frame. */
+  badgeSize?: 'sm' | 'md';
   children?: React.ReactNode;
 }) {
+  const badge = badgeSize === 'sm' ? 'h-7 w-7' : 'h-11 w-11';
+
   return (
     <div
       className={cx('relative overflow-hidden bg-slate-200', rounded, className)}
@@ -527,9 +549,43 @@ export function PhotoFrame({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={photo.url} alt={photo.altText} className="h-full w-full object-cover" loading="lazy" />
       ) : null}
+
+      {photo?.video ? (
+        <>
+          <span
+            aria-hidden
+            className={cx(
+              'absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-brand-600/95 text-white shadow-pop',
+              badge,
+            )}
+          >
+            {/* A solid triangle, nudged right so it reads as centred in the
+                circle — a geometrically centred play glyph looks off to the
+                left, which is why every player offsets it. */}
+            <svg viewBox="0 0 24 24" className={badgeSize === 'sm' ? 'h-3 w-3' : 'h-4 w-4'} fill="currentColor">
+              <path d="M8 5.5v13l11-6.5z" />
+            </svg>
+          </span>
+
+          {badgeSize === 'md' ? (
+            // Bottom-left: the bottom-right corner already carries the photo
+            // counter on the listing hero, and two chips there collide.
+            <span className="absolute bottom-2 left-2 rounded bg-black/65 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-white">
+              {formatClipLength(photo.video.durationSeconds)}
+            </span>
+          ) : null}
+        </>
+      ) : null}
+
       {children}
     </div>
   );
+}
+
+/** `m:ss`, the form every video player uses for a clip under an hour. */
+function formatClipLength(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(Math.round(seconds % 60)).padStart(2, '0')}`;
 }
 
 export function Card({

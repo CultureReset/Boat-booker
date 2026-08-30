@@ -16,6 +16,27 @@
     /* Bottom tab bar height, used to pad scroll containers on mobile. */
     --tabbar-height: 56px;
     --header-height: 56px;
+
+    /*
+     * The primary call to action.
+     *
+     * BoatBooker's chrome is blue in both apps, but the guest app's primary
+     * action is orange and the operator app's is blue. That is a property of
+     * which app you are in, not of any one button — so it lives here, on the
+     * shell, and every `variant="primary"` follows it. Blue is the default;
+     * the guest shells override it below.
+     */
+    --cta: #1d70f1;
+    --cta-hover: #1659de;
+    --cta-active: #1949b4;
+    --cta-disabled: #8ecdff;
+  }
+
+  [data-app='guest'] {
+    --cta: #ff5e1a;
+    --cta-hover: #f04407;
+    --cta-active: #c73208;
+    --cta-disabled: #ffa974;
   }
 
   html {

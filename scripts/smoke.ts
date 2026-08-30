@@ -181,29 +181,50 @@ async function main(): Promise<void> {
   const pkg = ownerCharter.data.packages[0];
   check('owner listing has a bookable trip', Boolean(pkg));
 
-  // Find a date the calendar actually reports as open.
+  // Find a date this trip can actually run on.
+  //
+  // The calendar is charter-level: a day is "available" when *any* of the
+  // listing's trips can run, and each trip carries its own weekday mask. So an
+  // open day is a candidate, not an answer — the quote is what decides, and
+  // that is exactly what the booking form does before it enables its button.
   const ownerAvailability = await guest.get<{ days: { date: string; state: string }[] }>(
     `/api/charters/${ownerCharterId}/availability?days=180`,
   );
-  const openDay = ownerAvailability.data.days.find((d) => d.state === 'available');
-  check('an open date exists', Boolean(openDay), ownerAvailability.data.days.slice(0, 5));
+  const openDays = ownerAvailability.data.days.filter((d) => d.state === 'available');
+  check('an open date exists', openDays.length > 0, ownerAvailability.data.days.slice(0, 5));
 
   const guests = Math.max(pkg.minPersons, 2);
-  const quotePayload = {
+  const payloadFor = (date: string) => ({
     charterId: ownerCharterId,
     packageId: pkg.id,
-    date: openDay!.date,
+    date,
     adults: guests,
     children: 0,
     days: 1,
     paymentMode: 'online_deposit',
     currency: 'USD',
-  };
+  });
 
-  const quote = await customer.post<{
+  type Quote = {
     available: boolean;
     breakdown: { total: number; dueNow: number; dueOnArrival: number; lines: unknown[] };
-  }>('/api/bookings/quote', quotePayload);
+  };
+
+  let openDay: { date: string } | undefined;
+  let quote!: { status: number; data: Quote; error?: { code: string; message: string } };
+
+  for (const candidate of openDays.slice(0, 30)) {
+    const attempt = await customer.post<Quote>('/api/bookings/quote', payloadFor(candidate.date));
+    if (attempt.status === 200 && attempt.data?.available) {
+      openDay = candidate;
+      quote = attempt;
+      break;
+    }
+  }
+
+  check('a bookable date exists for this trip', Boolean(openDay), openDays.slice(0, 5));
+
+  const quotePayload = payloadFor(openDay!.date);
   check('quote succeeds', quote.status === 200, quote.error);
   check('quote is available', quote.data?.available === true, quote.data);
   check('quote has a positive total', (quote.data?.breakdown?.total ?? 0) > 0, quote.data?.breakdown);

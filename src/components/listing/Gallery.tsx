@@ -21,6 +21,8 @@ export interface GalleryPhoto {
   url?: string;
   placeholder: string;
   altText: string;
+  /** Set when the asset is a clip; `url` above is then its poster frame. */
+  video?: { url?: string; durationSeconds: number };
 }
 
 export function Gallery({ photos, title }: { photos: GalleryPhoto[]; title: string }) {
@@ -154,7 +156,21 @@ function PhotoViewer({
   return (
     <Overlay open onClose={onClose} title={title} size="full" variant="dialog">
       <div className="flex flex-col gap-3">
-        <PhotoFrame photo={photo} className="aspect-[4/3] w-full" />
+        {/* A clip with a file plays here; one without falls back to its
+            poster and badge, the same way a still without a bitmap falls back
+            to its gradient. */}
+        {photo.video?.url ? (
+          <video
+            key={photo.id}
+            src={photo.video.url}
+            poster={photo.url || undefined}
+            controls
+            playsInline
+            className="aspect-[4/3] w-full rounded-card bg-black object-cover"
+          />
+        ) : (
+          <PhotoFrame photo={photo} className="aspect-[4/3] w-full" />
+        )}
 
         <div className="flex items-center justify-between gap-3">
           <button
@@ -195,7 +211,7 @@ function PhotoViewer({
                 thumbIndex === index ? 'ring-2 ring-brand-600' : 'opacity-60 hover:opacity-100',
               )}
             >
-              <PhotoFrame photo={thumb} rounded="rounded" className="h-14 w-20" />
+              <PhotoFrame photo={thumb} rounded="rounded" badgeSize="sm" className="h-14 w-20" />
             </button>
           ))}
         </div>

@@ -44,7 +44,7 @@ export default async function OwnerLayout({ children }: { children: React.ReactN
   ];
 
   return (
-    <div className="flex min-h-dvh flex-col bg-surface-sunken">
+    <div data-app="owner" className="flex min-h-dvh flex-col bg-surface-sunken">
       <Header />
       {/* Stacks on mobile — the nav renders as a horizontal chip rail there,
           and as a flex row sibling it would squeeze the main column to zero. */}
