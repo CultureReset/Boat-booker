@@ -329,10 +329,33 @@ function BookingRow({
           </>
         ) : null}
 
+        {/* A live balance is the most urgent thing on a confirmed booking, so
+            it leads the row rather than hiding behind "view details". */}
+        {role === 'customer' && booking.balance?.outstanding > 0 && !booking.balance?.paidAt ? (
+          <LinkButton
+            href={`/account/bookings/${booking.id}`}
+            size="sm"
+            className="bg-accent text-white hover:bg-accent-600"
+          >
+            {t('bookings', 'payNow')}
+          </LinkButton>
+        ) : null}
+
+        {role === 'customer' && booking.status === 'done' && !booking.tip ? (
+          <LinkButton href={`/pay/tip?booking=${booking.id}`} variant="outline" size="sm">
+            {t('bookings', 'leaveTip')}
+          </LinkButton>
+        ) : null}
+
         {booking.canCancel ? (
-          <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy} className="text-danger">
+          <LinkButton
+            href={`/${role === 'owner' ? 'owner' : 'account'}/bookings/${booking.id}/cancel`}
+            size="sm"
+            variant="ghost"
+            className="text-danger"
+          >
             {t('bookings', 'cancelBooking')}
-          </Button>
+          </LinkButton>
         ) : null}
 
         {role === 'customer' && booking.canReview ? (

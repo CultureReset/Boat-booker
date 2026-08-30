@@ -673,6 +673,13 @@ export const catalog = {
     emptyTitle: 'No bookings yet',
     emptyBody: 'When you book a trip it shows up here with all its details.',
     emptyCta: 'Find a boat',
+    payNow: 'Pay now',
+    leaveTip: 'Leave a tip',
+    depositSecured: 'Deposit secured',
+    paymentSecured: 'Payment secured',
+    fullyPaid: 'Fully paid',
+    paidAndTipped: 'Fully paid & tipped',
+    remainingBalanceLabel: 'Remaining balance',
     statusRequest: 'Request',
     statusPending: 'Pending',
     statusConfirmed: 'Confirmed',
@@ -814,6 +821,72 @@ export const catalog = {
     quickRepliesEmpty: 'You don’t have any templates yet.',
     manageQuickReplies: 'Manage Quick Replies',
     useThisReply: 'Use this reply',
+  },
+
+  pay: {
+    // Tips
+    tipTitle: 'Add a tip?',
+    tipDescription:
+      'The tip is a percentage of the original trip price (%price%) and goes entirely to %captain%.',
+    tipNotIncluded: 'Tips are not included in the trip price.',
+    noTip: 'No tip',
+    customTip: 'Custom',
+    customTipLabel: 'Enter tip amount',
+    customTipHint: 'You can tip between %min%% and %max%%.',
+    tipTooLow: 'The tip can’t be less than %min%% of the trip price.',
+    tipTooHigh: 'The tip can’t be more than %max%% of the trip price.',
+    payTip: 'Pay tip',
+    tipThanksTitle: 'Thank you for your tip!',
+    tipThanksBody: 'We’ve let %captain% know.',
+    tipDisabledTitle: 'Tip your captain in person',
+    tipDisabledBody:
+      'This operator prefers to receive tips in person. You can hand it over on the day.',
+    alreadyTipped: 'You’ve already tipped this trip.',
+
+    // Balance
+    balanceTitle: 'Pay remaining balance',
+    balanceDetails: 'Remaining balance details',
+    tripPrice: 'Trip price',
+    remainingBalance: 'Remaining balance',
+    processingFee: 'Processing fee',
+    totalToPay: 'Total to pay',
+    requestedByCaptain: 'Requested by %captain%',
+    confirmAndPay: 'Confirm and pay',
+    confirming: 'Confirming…',
+    paymentSuccessTitle: 'Payment successful',
+    paymentSuccessBody: 'A receipt will be emailed to you shortly.',
+    paymentFailedTitle: 'Payment unsuccessful',
+    paymentFailedBody:
+      'We couldn’t process this payment because the card has expired. Please try another card.',
+    sessionExpiredTitle: 'Payment session expired',
+    sessionExpiredBody:
+      'This payment request is no longer valid. Ask your captain for a new link, or settle in person.',
+    accessDeniedTitle: 'You can’t access this page',
+    accessDeniedBody: 'This payment link belongs to someone else.',
+    tryAgain: 'Try again',
+    savedPaymentMethod: 'This is your saved payment method.',
+    amountNonRefundable: 'The amount paid is non-refundable except under our cancellation policy.',
+
+    // How the balance gets collected
+    collectionTitle: 'How would you like to pay the balance?',
+    collectDirect: 'Pay the captain directly',
+    collectDirectBody: 'Settle in cash or card on the day of your trip.',
+    collectOnline: 'Pay online any time',
+    collectOnlineBody: 'Use a payment link whenever suits you before the trip.',
+    collectScheduled: 'Charge my card automatically',
+    collectScheduledBody: 'We’ll charge %amount% the day before your trip. You can cancel any time.',
+    scheduledOn: 'Scheduled for %date%',
+    cancelAutoPay: 'Cancel auto-pay',
+    requestBalance: 'Request remaining balance',
+    balanceRequested: 'We’ve sent the customer a payment link.',
+
+    // Async settlement
+    processingTitle: 'Finalising your booking',
+    processingBody: 'Hang tight — this usually takes just a moment.',
+    processingWarning: 'Your payment is still being processed. Please stay on this page.',
+    failedTitle: 'Something went wrong with your payment',
+    failedBody: 'No money has been taken. You can try again, or pick another payment method.',
+    backToListing: 'Back to the listing',
   },
 
   changeBooking: {

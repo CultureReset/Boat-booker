@@ -11,6 +11,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Badge, Divider, LinkButton, PhotoFrame } from '@/components/ui/primitives';
 import { BookingActions } from '@/components/account/BookingActions';
 import { ChangeRequestPanel } from '@/components/booking/ChangeBookingFlow';
+import { BalanceCollection } from '@/components/payments/BalanceFlow';
 
 export const metadata: Metadata = { title: t('bookings', 'viewDetails') };
 
@@ -225,6 +226,18 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
             {t('bookings', 'leaveReview')}
           </LinkButton>
         ) : null}
+        {/* Only meaningful once the trip is actually on. */}
+        {(booking.status === 'confirmed' || booking.status === 'accepted') &&
+        booking.balance.outstanding > 0 ? (
+          <BalanceCollection
+            bookingId={booking.id}
+            mode={booking.balance.mode}
+            outstanding={booking.balance.outstanding}
+            currency={booking.currency}
+            scheduledFor={booking.balance.scheduledFor}
+          />
+        ) : null}
+
         {booking.changeRequest ? (
           <ChangeRequestPanel
             bookingId={booking.id}

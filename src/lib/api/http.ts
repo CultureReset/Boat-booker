@@ -5,6 +5,7 @@ import type { Database, User } from '@/lib/domain/types';
 import { settleElapsedBookings } from '@/lib/services/bookings';
 import { settleElapsedChanges } from '@/lib/services/changes';
 import { settleElapsedOffers } from '@/lib/services/offers';
+import { settleScheduledBalances } from '@/lib/services/payments';
 
 /**
  * Shared HTTP plumbing for the route handlers.
@@ -113,7 +114,12 @@ export async function settle(): Promise<void> {
     db.inquiries.some((i) => i.status === 'open' && i.respondByAt <= nowIso) ||
     db.changeRequests.some((c) => c.status === 'requested' && c.expiresAt <= nowIso);
 
+  const balancesDue = db.bookings.some(
+    (b) => b.balance.mode === 'scheduled' && !b.balance.paidAt && (b.balance.scheduledFor ?? '') <= todayIso,
+  );
+
   if (bookingsDue) await mutate((next) => settleElapsedBookings(next));
+  if (balancesDue) await mutate((next) => settleScheduledBalances(next));
   if (offersDue) {
     await mutate((next) => {
       settleElapsedOffers(next);

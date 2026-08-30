@@ -267,24 +267,37 @@ export function Checkbox({
 
 export function Radio({
   label,
+  sublabel,
   count,
   className,
   ...rest
-}: React.InputHTMLAttributes<HTMLInputElement> & { label: React.ReactNode; count?: number }) {
+}: React.InputHTMLAttributes<HTMLInputElement> & {
+  label: React.ReactNode;
+  /** Second line explaining the option. Aligns to the top when present. */
+  sublabel?: React.ReactNode;
+  count?: number;
+}) {
   return (
     <label
       className={cx(
-        'flex cursor-pointer items-center gap-3 rounded-control py-2 transition-colors hover:bg-surface-sunken',
+        'flex cursor-pointer gap-3 rounded-control py-2 transition-colors hover:bg-surface-sunken',
+        sublabel ? 'items-start' : 'items-center',
         className,
       )}
     >
       <input
         type="radio"
-        className="h-5 w-5 shrink-0 cursor-pointer border-line text-brand-600 focus:ring-2 focus:ring-brand-500/40"
+        className={cx(
+          'h-5 w-5 shrink-0 cursor-pointer border-line text-brand-600 focus:ring-2 focus:ring-brand-500/40',
+          Boolean(sublabel) && 'mt-0.5',
+        )}
         {...rest}
       />
       <span className="flex flex-1 items-baseline justify-between gap-2">
-        <span className="text-sm text-ink">{label}</span>
+        <span className="min-w-0">
+          <span className="block text-sm text-ink">{label}</span>
+          {sublabel ? <span className="block text-xs text-ink-muted">{sublabel}</span> : null}
+        </span>
         {count !== undefined ? <span className="text-xs tabular-nums text-ink-faint">{count}</span> : null}
       </span>
     </label>
