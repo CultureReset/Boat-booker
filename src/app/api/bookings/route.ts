@@ -90,6 +90,9 @@ export async function POST(request: Request) {
         messageToOwner: body.messageToOwner ? String(body.messageToOwner) : undefined,
         applyCredit: Boolean(body.applyCredit),
         promoDiscount: Number(body.promoDiscount) || 0,
+        offerId: body.offerId ? String(body.offerId) : undefined,
+        addOns: body.addOns,
+        buddyEmails: Array.isArray(body.buddyEmails) ? body.buddyEmails.map(String) : undefined,
         contact: {
           firstName: String(body.contact?.firstName ?? auth.user.firstName),
           lastName: String(body.contact?.lastName ?? auth.user.lastName),

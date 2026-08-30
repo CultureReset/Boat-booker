@@ -1,6 +1,7 @@
 import { commerceConfig } from '@/config/brand';
 import { convert, roundMoney } from '@/lib/core/money';
 import type {
+  AddOn,
   Charter,
   PaymentMode,
   PriceBreakdown,
@@ -36,6 +37,17 @@ export interface BreakdownInput {
   creditApplied?: number;
   /** Flat promotional discount in the display currency. */
   promoDiscount?: number;
+  /** Paid extras chosen at checkout, priced in the listing's currency. */
+  addOns?: { addOn: AddOn; quantity: number }[];
+  /**
+   * Replaces the computed base fare with an agreed total.
+   *
+   * Set when a booking comes from an accepted custom offer: the operator has
+   * already named a number, and recomputing from the package would quietly
+   * overwrite the discount they chose to give. Fees still apply on top, so the
+   * platform's cut is never negotiated away by accident.
+   */
+  agreedTripPrice?: number;
 }
 
 export function computeBreakdown(input: BreakdownInput): PriceBreakdown {
@@ -50,6 +62,8 @@ export function computeBreakdown(input: BreakdownInput): PriceBreakdown {
     loyaltyDiscountPercent = 0,
     creditApplied = 0,
     promoDiscount = 0,
+    addOns = [],
+    agreedTripPrice,
   } = input;
 
   const from = pkg.currency;
@@ -62,7 +76,11 @@ export function computeBreakdown(input: BreakdownInput): PriceBreakdown {
   // --- Base fare ------------------------------------------------------------
   // Shared trips are priced per head; private trips price the whole boat.
   const baseAmount =
-    pkg.type === 'shared' ? cv(pkg.price) * guests * days : cv(pkg.price) * days;
+    agreedTripPrice !== undefined
+      ? cv(agreedTripPrice)
+      : pkg.type === 'shared'
+        ? cv(pkg.price) * guests * days
+        : cv(pkg.price) * days;
 
   lines.push({
     key: 'base',
@@ -73,7 +91,12 @@ export function computeBreakdown(input: BreakdownInput): PriceBreakdown {
   // --- Additional guests ----------------------------------------------------
   // Private trips may include a headcount in the base and charge beyond it.
   let additionalAmount = 0;
-  if (pkg.type === 'private' && pkg.additionalPersonAfter && pkg.additionalPersonPrice) {
+  if (
+    agreedTripPrice === undefined &&
+    pkg.type === 'private' &&
+    pkg.additionalPersonAfter &&
+    pkg.additionalPersonPrice
+  ) {
     const extraGuests = Math.max(0, guests - pkg.additionalPersonAfter);
     additionalAmount = cv(pkg.additionalPersonPrice) * extraGuests * days;
     if (extraGuests > 0) {
@@ -85,7 +108,20 @@ export function computeBreakdown(input: BreakdownInput): PriceBreakdown {
     }
   }
 
-  const subtotal = roundMoney(baseAmount + additionalAmount, to);
+  // --- Add-ons --------------------------------------------------------------
+  // Priced before discounts so loyalty applies to the whole basket, matching
+  // how the platform describes it ("prices shown include all applicable
+  // discounts and fees").
+  let addOnAmount = 0;
+  for (const { addOn, quantity } of addOns) {
+    if (quantity < 1) continue;
+    const units = addOn.pricing === 'per_person' ? Math.min(quantity, guests) : 1;
+    const amount = cv(addOn.price) * units * (addOn.pricing === 'per_booking' ? 1 : days);
+    addOnAmount += amount;
+    lines.push({ key: `add_on:${addOn.id}`, label: addOn.title, amount });
+  }
+
+  const subtotal = roundMoney(baseAmount + additionalAmount + addOnAmount, to);
 
   // --- Discounts ------------------------------------------------------------
   const loyaltyAmount =

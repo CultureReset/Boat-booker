@@ -1,7 +1,7 @@
 import { reviewCriteria } from '@/config/taxonomy';
 import { newId } from '@/lib/core/ids';
 import type { Database, Review } from '@/lib/domain/types';
-import { notify } from './bookings';
+import { notify } from './notifications';
 
 /**
  * Reviews.

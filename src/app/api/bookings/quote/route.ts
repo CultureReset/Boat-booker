@@ -34,6 +34,7 @@ export async function POST(request: Request) {
         customerId: viewer?.id,
         applyCredit: Boolean(body.applyCredit),
         promoDiscount: Number(body.promoDiscount) || 0,
+        addOns: (body.addOns ?? undefined) as Record<string, number> | undefined,
       }),
     );
 

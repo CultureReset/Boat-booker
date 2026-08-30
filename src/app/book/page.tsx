@@ -36,6 +36,15 @@ export default async function BookPage({
 
   const viewer = await currentUser();
 
+  // An offer fixes the trip, date, group and price; checkout renders those as
+  // read-only rather than letting the guest edit terms the operator agreed to.
+  const offerId = typeof query.offer === 'string' ? query.offer : undefined;
+  const offer = offerId
+    ? db.offers.find(
+        (o) => o.id === offerId && o.customerId === viewer?.id && o.status === 'sent',
+      )
+    : undefined;
+
   const detail = buildCharterDetail({
     db,
     charter,
@@ -51,7 +60,25 @@ export default async function BookPage({
 
   return (
     <Suspense fallback={<div className="mx-auto max-w-shell px-4 py-8"><div className="skeleton h-96 w-full rounded-card" /></div>}>
-      <Checkout charter={detail} />
+      <Checkout
+        charter={detail}
+        offer={
+          offer
+            ? {
+                id: offer.id,
+                packageId: offer.packageId,
+                date: offer.date,
+                departureTime: offer.departureTime,
+                adults: offer.adults,
+                children: offer.children,
+                days: offer.days,
+                price: offer.price,
+                currency: offer.currency,
+                expiresAt: offer.expiresAt,
+              }
+            : undefined
+        }
+      />
     </Suspense>
   );
 }

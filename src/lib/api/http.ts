@@ -3,6 +3,7 @@ import { currentUser } from '@/lib/auth/session';
 import { getDb, mutate } from '@/lib/storage';
 import type { Database, User } from '@/lib/domain/types';
 import { settleElapsedBookings } from '@/lib/services/bookings';
+import { settleElapsedOffers } from '@/lib/services/offers';
 
 /**
  * Shared HTTP plumbing for the route handlers.
@@ -49,7 +50,13 @@ export function fromServiceError(error: unknown): NextResponse {
     const status =
       code === 'forbidden' ? 403
       : code === 'not_found' || code.endsWith('_not_found') ? 404
-      : code === 'unavailable' ? 409
+      : code === 'unavailable' || code === 'already_pending' ? 409
+      // A blocked message is a policy refusal, not a malformed request, and the
+      // client shows a different modal for it.
+      : code === 'blocked' ? 422
+      // Gone, not bad: the offer or payment link was valid and has lapsed.
+      : code === 'expired' ? 410
+      : code === 'rate_limited' ? 429
       : 400;
 
     return fail(code, message, status, details);
@@ -83,15 +90,30 @@ export async function withMutation<T>(fn: (db: Database) => T): Promise<T> {
   return mutate(fn);
 }
 
-/** Advance any bookings whose trip date has passed. Cheap and idempotent. */
+/**
+ * Advance anything whose clock has run out. Cheap and idempotent.
+ *
+ * Expiry is observed on read rather than driven by a scheduler, so the demo
+ * advances with wall-clock time on any machine without a cron. The `some()`
+ * guards keep the common case to a scan with no write.
+ */
 export async function settle(): Promise<void> {
   const db = await getDb();
-  const pendingSettlement = db.bookings.some(
+  const nowIso = new Date().toISOString();
+  const todayIso = nowIso.slice(0, 10);
+
+  const bookingsDue = db.bookings.some(
     (b) =>
-      (b.status === 'confirmed' && b.date < new Date().toISOString().slice(0, 10)) ||
-      (b.status === 'pending' && b.respondByAt && b.respondByAt < new Date().toISOString()),
+      (b.status === 'confirmed' && b.date < todayIso) ||
+      (b.status === 'pending' && b.respondByAt && b.respondByAt < nowIso),
   );
-  if (pendingSettlement) await mutate((next) => settleElapsedBookings(next));
+  const offersDue =
+    db.offers.some((o) => o.status === 'sent' && o.expiresAt <= nowIso) ||
+    db.inquiries.some((i) => i.status === 'open' && i.respondByAt <= nowIso) ||
+    db.changeRequests.some((c) => c.status === 'requested' && c.expiresAt <= nowIso);
+
+  if (bookingsDue) await mutate((next) => settleElapsedBookings(next));
+  if (offersDue) await mutate((next) => settleElapsedOffers(next));
 }
 
 export type AuthedHandler<T> = (user: User, db: Database) => T | Promise<T>;

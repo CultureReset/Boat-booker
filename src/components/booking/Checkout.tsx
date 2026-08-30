@@ -39,17 +39,39 @@ interface Quote {
   creditApplied: number;
 }
 
-export function Checkout({ charter }: { charter: CharterDetail }) {
+export interface CheckoutOffer {
+  id: string;
+  packageId: string | null;
+  date: string;
+  departureTime: string;
+  adults: number;
+  children: number;
+  days: number;
+  price: number;
+  currency: string;
+  expiresAt: string;
+}
+
+export function Checkout({
+  charter,
+  offer,
+}: {
+  charter: CharterDetail;
+  /** Set when the guest is accepting an operator's custom offer. */
+  offer?: CheckoutOffer;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currency } = usePreferences();
   const { user, summary, refresh } = useSession();
 
-  const packageId = searchParams.get('trip') ?? '';
-  const date = searchParams.get('date') ?? '';
-  const departureTime = searchParams.get('time') ?? '';
-  const adults = Math.max(1, Number(searchParams.get('adults')) || 1);
-  const children = Math.max(0, Number(searchParams.get('children')) || 0);
+  // An offer's terms win over the query string: the operator agreed to those
+  // exact ones, and the server will price against them regardless.
+  const packageId = offer?.packageId ?? searchParams.get('trip') ?? '';
+  const date = offer?.date ?? searchParams.get('date') ?? '';
+  const departureTime = offer?.departureTime ?? searchParams.get('time') ?? '';
+  const adults = offer?.adults ?? Math.max(1, Number(searchParams.get('adults')) || 1);
+  const children = offer?.children ?? Math.max(0, Number(searchParams.get('children')) || 0);
 
   const pkg = useMemo(
     () => charter.packages.find((p) => p.id === packageId) ?? null,
@@ -160,6 +182,7 @@ export function Checkout({ charter }: { charter: CharterDetail }) {
         paymentMethodId: paymentMode === 'on_arrival' ? undefined : selectedCardId || undefined,
         messageToOwner: messageToOwner.trim() || undefined,
         contact: { firstName, lastName, email, phone },
+        offerId: offer?.id,
       });
 
       await refresh();

@@ -4,7 +4,7 @@ import { translate as t } from '@/i18n/translate';
 import { currentUser } from '@/lib/auth/session';
 import { mutate } from '@/lib/storage';
 import { markThreadRead, readThread } from '@/lib/services/messages';
-import { ThreadView } from '@/components/account/Inbox';
+import { ThreadView } from '@/components/inbox/Thread';
 
 export const metadata: Metadata = { title: t('inbox', 'title') };
 

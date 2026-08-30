@@ -23,6 +23,27 @@ const config: Config = {
           900: '#1a418e',
           950: '#142956',
         },
+        /**
+         * The guest app's primary action colour.
+         *
+         * Deliberately not `brand`: the real product uses blue chrome with an
+         * orange call to action on the customer side, and blue on both in the
+         * operator app. Keeping them as separate tokens is what lets one
+         * codebase render two apps that look correctly different.
+         */
+        accent: {
+          DEFAULT: '#ff5e1a',
+          50: '#fff5ed',
+          100: '#ffe8d5',
+          200: '#ffcdaa',
+          300: '#ffa974',
+          400: '#ff7d3c',
+          500: '#ff5e1a',
+          600: '#f04407',
+          700: '#c73208',
+          800: '#9e290f',
+          900: '#7f2510',
+        },
         ink: {
           DEFAULT: '#0f172a',
           soft: '#475569',

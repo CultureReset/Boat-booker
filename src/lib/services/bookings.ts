@@ -4,7 +4,10 @@ import { newBookingReference, newId } from '@/lib/core/ids';
 import { roundMoney } from '@/lib/core/money';
 import { bookingExtras } from '@/lib/domain/defaults';
 import type {
+  AddOn,
   Booking,
+  BookingAddOn,
+  BookingSource,
   BookingStatus,
   CancellationReasonKey,
   Database,
@@ -13,6 +16,8 @@ import type {
   PriceBreakdown,
 } from '@/lib/domain/types';
 import { buildBlockIndex, packageAvailability, releaseDates, reserveDates } from './availability';
+import { notify } from './notifications';
+import { assertOfferBookable, markOfferAccepted } from './offers';
 import { computeBreakdown, loyaltyTierFor, refundFor } from './pricing';
 
 /**
@@ -65,6 +70,10 @@ export interface QuoteInput {
   customerId?: string;
   promoDiscount?: number;
   applyCredit?: boolean;
+  /** Add-on id → quantity. */
+  addOns?: Record<string, number>;
+  /** Price agreed in a custom offer, replacing the package's list price. */
+  agreedTripPrice?: number;
 }
 
 export interface Quote {
@@ -120,6 +129,8 @@ export function quote(db: Database, input: QuoteInput): Quote {
     loyaltyDiscountPercent: loyalty.discountPercentage,
     creditApplied: creditAvailable,
     promoDiscount: input.promoDiscount,
+    addOns: resolveAddOnLines(db, charter.id, input.addOns),
+    agreedTripPrice: input.agreedTripPrice,
   });
 
   const creditLine = breakdown.lines.find((l) => l.key === 'credit');
@@ -143,6 +154,14 @@ export interface CreateBookingInput extends QuoteInput {
   contact: { firstName: string; lastName: string; email: string; phone: string };
   messageToOwner?: string;
   paymentMethodId?: string;
+  /** Accepting an operator's custom offer rather than booking off the listing. */
+  offerId?: string;
+  /** Paid extras, as add-on id → quantity. */
+  addOns?: Record<string, number>;
+  /** Direct and manual bookings skip commission; the caller vouches for this. */
+  source?: BookingSource;
+  /** Invitees to add to the trip at checkout. */
+  buddyEmails?: string[];
 }
 
 /**
@@ -155,6 +174,13 @@ export interface CreateBookingInput extends QuoteInput {
 export function createBooking(db: Database, input: CreateBookingInput): Booking {
   const charter = db.charters.find((c) => c.id === input.charterId);
   if (!charter) throw new BookingError('charter_not_found', 'Listing not found');
+
+  // An accepted offer carries its own price and its own availability check.
+  // Validating it here — before anything else runs — means a stale or hijacked
+  // offer id can never reach the pricing engine.
+  const offer = input.offerId
+    ? assertOfferBookable(db, input.offerId, input.customerId).offer
+    : undefined;
 
   const pkg = db.packages.find((p) => p.id === input.packageId && p.charterId === charter.id);
   if (!pkg) throw new BookingError('package_not_found', 'Trip not found');
@@ -181,9 +207,11 @@ export function createBooking(db: Database, input: CreateBookingInput): Booking 
   }
 
   // Recompute the price server-side; the client's number is never trusted.
-  const priced = quote(db, input);
+  const priced = quote(db, { ...input, agreedTripPrice: offer?.price });
 
-  const instant = charter.policies.isInstantBookActive;
+  // An offer is the operator already saying yes, so accepting one confirms
+  // immediately even on a listing that normally takes requests.
+  const instant = charter.policies.isInstantBookActive || Boolean(offer);
   const status: BookingStatus = instant ? 'confirmed' : 'pending';
   const nowIso = new Date().toISOString();
 
@@ -214,6 +242,14 @@ export function createBooking(db: Database, input: CreateBookingInput): Booking 
     respondByAt: instant
       ? undefined
       : new Date(Date.now() + commerceConfig.inquiryResponseWindowHours * 3_600_000).toISOString(),
+    source: input.source ?? 'marketplace',
+    offerId: offer?.id,
+    addOns: resolveAddOns(db, charter.id, input.addOns),
+    buddyInvitations: (input.buddyEmails ?? []).slice(0, 10).map((email) => ({
+      id: newId(),
+      email: email.trim().toLowerCase(),
+      invitedAt: nowIso,
+    })),
   };
 
   // A pending request also holds the date — otherwise the owner could accept a
@@ -234,19 +270,44 @@ export function createBooking(db: Database, input: CreateBookingInput): Booking 
 
   if (status === 'confirmed') schedulePayout(db, booking);
 
-  // Open a message thread so the guest and owner have somewhere to talk.
-  const thread = {
+  // A booking that came from an offer continues the conversation it was
+  // negotiated in — starting a second thread would strand the context that
+  // explains the price.
+  const existingThread = offer && db.threads.find((t) => t.id === offer.threadId);
+  const thread =
+    existingThread ??
+    (() => {
+      const created = {
+        id: newId(),
+        customerId: input.customerId,
+        ownerId: charter.ownerId,
+        charterId: charter.id,
+        bookingId: booking.id,
+        kind: 'booking' as const,
+        subject: charter.title,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      db.threads.push(created);
+      return created;
+    })();
+
+  if (existingThread) {
+    existingThread.bookingId = booking.id;
+    existingThread.kind = 'booking';
+    existingThread.updatedAt = nowIso;
+  }
+
+  if (offer) markOfferAccepted(db, offer.id, booking.id);
+
+  db.messages.push({
     id: newId(),
-    customerId: input.customerId,
-    ownerId: charter.ownerId,
-    charterId: charter.id,
-    bookingId: booking.id,
-    kind: 'booking' as const,
-    subject: charter.title,
+    threadId: thread.id,
+    body: '',
     createdAt: nowIso,
-    updatedAt: nowIso,
-  };
-  db.threads.push(thread);
+    deliveredAt: nowIso,
+    systemEvent: instant ? 'booking_confirmed' : 'booking_requested',
+  });
 
   if (input.messageToOwner?.trim()) {
     db.messages.push({
@@ -448,29 +509,6 @@ function requireBooking(db: Database, bookingId: string): Booking {
   return booking;
 }
 
-export function notify(
-  db: Database,
-  userId: string,
-  input: {
-    type: string;
-    category: NotificationCategory;
-    title: string;
-    body: string;
-    href?: string;
-  },
-): void {
-  db.notifications.push({
-    id: newId(),
-    userId,
-    type: input.type,
-    category: input.category,
-    channels: ['push', 'email'],
-    title: input.title,
-    body: input.body,
-    href: input.href,
-    createdAt: new Date().toISOString(),
-  });
-}
 
 /** Booking with everything the detail screens render, resolved in one pass. */
 export function expandBooking(db: Database, booking: Booking) {
@@ -533,3 +571,42 @@ export function expandBooking(db: Database, booking: Booking) {
 }
 
 export type ExpandedBooking = ReturnType<typeof expandBooking>;
+
+/**
+ * Resolves add-on ids to priced lines, dropping anything that is not a live
+ * add-on on this listing.
+ *
+ * Silently dropping rather than erroring is deliberate: an add-on retired
+ * between page load and submit should not fail the whole booking, and the
+ * server-side price the guest is shown afterwards reflects what they actually
+ * get.
+ */
+function resolveAddOnLines(
+  db: Database,
+  charterId: string,
+  requested: Record<string, number> | undefined,
+): { addOn: AddOn; quantity: number }[] {
+  if (!requested) return [];
+  const out: { addOn: AddOn; quantity: number }[] = [];
+
+  for (const [addOnId, quantity] of Object.entries(requested)) {
+    const addOn = db.addOns.find((a) => a.id === addOnId && a.charterId === charterId && a.active);
+    if (!addOn || quantity < 1) continue;
+    out.push({ addOn, quantity: Math.min(quantity, addOn.maxQuantity) });
+  }
+  return out;
+}
+
+/** The same resolution, flattened into what a booking stores. */
+function resolveAddOns(
+  db: Database,
+  charterId: string,
+  requested: Record<string, number> | undefined,
+): BookingAddOn[] {
+  return resolveAddOnLines(db, charterId, requested).map(({ addOn, quantity }) => ({
+    addOnId: addOn.id,
+    title: addOn.title,
+    unitPrice: addOn.price,
+    quantity,
+  }));
+}
