@@ -231,21 +231,46 @@ export function reserveDates(db: Database, booking: Booking, idFactory: () => st
   const index = buildBlockIndex(db);
   const span = Math.max(1, booking.days);
 
+  // Listings that share a hull block together. Checking the linked ones before
+  // writing anything is what stops one boat being sold twice under two names.
+  const linked = linkedCharterIds(db, booking.charterId);
+  const affected = [booking.charterId, ...linked];
+
   for (let offset = 0; offset < span; offset += 1) {
-    if (isBlocked(index, booking.charterId, addDays(booking.date, offset))) return false;
+    const date = addDays(booking.date, offset);
+    for (const charterId of affected) {
+      if (isBlocked(index, charterId, date)) return false;
+    }
   }
 
   for (let offset = 0; offset < span; offset += 1) {
-    db.availability.push({
-      id: idFactory(),
-      charterId: booking.charterId,
-      date: addDays(booking.date, offset),
-      reason: 'booking',
-      packageId: booking.packageId,
-      bookingId: booking.id,
-    });
+    const date = addDays(booking.date, offset);
+    for (const charterId of affected) {
+      db.availability.push({
+        id: idFactory(),
+        charterId,
+        date,
+        reason: 'booking',
+        // The linked listings carry the block but not the trip: the booking is
+        // on one listing, it just consumes the boat for all of them.
+        packageId: charterId === booking.charterId ? booking.packageId : undefined,
+        bookingId: booking.id,
+      });
+    }
   }
   return true;
+}
+
+/**
+ * Listings whose dates a booking on `charterId` must also consume.
+ *
+ * Lives here rather than with the linking UI because availability is what
+ * actually enforces it, and a rule enforced far from where it is defined is a
+ * rule that quietly stops being enforced.
+ */
+export function linkedCharterIds(db: Database, charterId: string): string[] {
+  const link = db.calendarLinks.find((l) => l.charterIds.includes(charterId));
+  return link ? link.charterIds.filter((id) => id !== charterId) : [];
 }
 
 /** Release the days a cancelled or declined booking was holding. */
