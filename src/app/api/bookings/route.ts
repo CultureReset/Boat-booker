@@ -40,9 +40,9 @@ export async function GET(request: Request) {
         case 'pending':
           return b.status === 'pending';
         case 'completed':
-          return b.status === 'completed';
+          return b.status === 'done';
         case 'cancelled':
-          return b.status === 'cancelled' || b.status === 'declined' || b.status === 'expired';
+          return b.status === 'cancelled' || b.status === 'declined' || b.status === 'withdrawn';
         case null:
         case '':
         case 'all':

@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const awaiting = asOwner
       ? []
       : db.bookings
-          .filter((b) => b.customerId === auth.user.id && b.status === 'completed' && !b.reviewId)
+          .filter((b) => b.customerId === auth.user.id && b.status === 'done' && !b.reviewId)
           .map((b) => {
             const charter = db.charters.find((c) => c.id === b.charterId);
             return {

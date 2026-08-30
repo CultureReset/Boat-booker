@@ -12,6 +12,7 @@ import { WEEKDAY_MASK_ALL, addDays, maskFromWeekdays, today, toIsoDate } from '@
 import { createRng, newBookingReference, type Rng } from '@/lib/core/ids';
 import { roundMoney } from '@/lib/core/money';
 import { hashPassword } from '@/lib/auth/password';
+import { bookingExtras, defaultPolicyExtras } from '@/lib/domain/defaults';
 import {
   emptyDatabase,
   type AvailabilityBlock,
@@ -27,6 +28,7 @@ import {
   type TripPackage,
   type User,
 } from '@/lib/domain/types';
+import { extendSeed } from './extend';
 import { seedCountries, seedDestinations, seedStates } from './geography';
 import { computeBreakdown } from '@/lib/services/pricing';
 
@@ -341,6 +343,7 @@ export function buildSeed(): Database {
 
       const charterId = nextId();
       const jitter = () => (rng() - 0.5) * 0.09;
+      const depositPercent = rng.weighted([[20, 5], [30, 2], [50, 2], [100, 1]] as const);
 
       const charter: Charter = {
         id: charterId,
@@ -389,10 +392,11 @@ export function buildSeed(): Database {
         activityKeys,
         policies: {
           freeCancellationDaysInAdvance: rng.weighted([[1, 2], [3, 4], [7, 3], [0, 1]] as const),
-          depositPercent: rng.weighted([[20, 5], [30, 2], [50, 2], [100, 1]] as const),
+          depositPercent,
           hasSecurityDeposit: rng.bool(0.3),
           securityDepositAmount: rng.pick([150, 200, 300, 500]),
           fuelIncludedInPrice: rng.bool(0.75),
+          ...defaultPolicyExtras(depositPercent),
           isInstantBookActive: rng.bool(0.45),
           acceptedPaymentMethods: rng
             .sample(paymentMethods.map((p) => p.key), rng.int(3, paymentMethods.length))
@@ -484,7 +488,7 @@ export function buildSeed(): Database {
 
       const status: Booking['status'] =
         daysOffset < 0
-          ? rng.weighted([['completed', 8], ['cancelled', 1]] as const)
+          ? rng.weighted([['done', 8], ['cancelled', 1]] as const)
           : rng.weighted([['confirmed', 6], ['pending', 2], ['cancelled', 1]] as const);
 
       const paymentMode: Booking['paymentMode'] = charter.policies.isInstantBookActive
@@ -503,6 +507,7 @@ export function buildSeed(): Database {
 
       const createdAt = new Date(Date.now() + (daysOffset - rng.int(3, 60)) * 86_400_000).toISOString();
       const booking: Booking = {
+        ...bookingExtras(breakdown.dueOnArrival, charter.currency),
         id: nextId(),
         reference: newBookingReference(rng),
         charterId: charter.id,
@@ -532,7 +537,7 @@ export function buildSeed(): Database {
       bookings.push(booking);
 
       // Confirmed and completed bookings consume that day on the calendar.
-      if (status === 'confirmed' || status === 'completed') {
+      if (status === 'confirmed' || status === 'done') {
         availability.push({
           id: nextId(),
           charterId: charter.id,
@@ -550,14 +555,14 @@ export function buildSeed(): Database {
           platformFee: roundMoney(breakdown.total * commerceConfig.serviceFeeRate, charter.currency),
           net: roundMoney(breakdown.total * (1 - commerceConfig.serviceFeeRate), charter.currency),
           currency: charter.currency,
-          status: status === 'completed' ? 'paid' : 'pending',
+          status: status === 'done' ? 'paid' : 'pending',
           scheduledFor: addDays(date, 2),
-          paidAt: status === 'completed' ? new Date(Date.now() + (daysOffset + 2) * 86_400_000).toISOString() : undefined,
+          paidAt: status === 'done' ? new Date(Date.now() + (daysOffset + 2) * 86_400_000).toISOString() : undefined,
         });
       }
 
       // Most completed trips leave a review.
-      if (status === 'completed' && rng.bool(0.72)) {
+      if (status === 'done' && rng.bool(0.72)) {
         const base = rng.weighted([[5, 6], [4, 3], [3, 1]] as const);
         const jitterRating = (v: number) => Math.max(1, Math.min(5, v + (rng.bool(0.3) ? rng.pick([-1, 1]) : 0)));
         const ratings = {
@@ -586,6 +591,7 @@ export function buildSeed(): Database {
       if (rng.bool(0.4)) {
         const thread: MessageThread = {
           id: nextId(),
+          kind: 'booking',
           customerId: customer.id,
           ownerId: charter.ownerId,
           charterId: charter.id,
@@ -658,6 +664,10 @@ export function buildSeed(): Database {
     demoOwner.ownerProfile.verification.status = 'verified';
   }
 
+  // Collections added after the first build — add-ons, itineraries, quick
+  // replies, account health, Direct, catches, and a standing offer.
+  extendSeed(db, rng, nextId);
+
   return db;
 }
 
@@ -666,8 +676,8 @@ function seedDemoCustomerActivity(db: Database, customer: User, rng: Rng, nextId
     { status: 'confirmed', offset: 12 },
     { status: 'confirmed', offset: 34 },
     { status: 'pending', offset: 21 },
-    { status: 'completed', offset: -30 },
-    { status: 'completed', offset: -95 },
+    { status: 'done', offset: -30 },
+    { status: 'done', offset: -95 },
     { status: 'cancelled', offset: -12 },
   ];
 
@@ -694,6 +704,7 @@ function seedDemoCustomerActivity(db: Database, customer: User, rng: Rng, nextId
     const createdAt = new Date(Date.now() - Math.abs(want.offset + 20) * 86_400_000).toISOString();
 
     const booking: Booking = {
+      ...bookingExtras(breakdown.dueOnArrival, charter.currency),
       id: nextId(),
       reference: newBookingReference(rng),
       charterId: charter.id,
@@ -735,6 +746,7 @@ function seedDemoCustomerActivity(db: Database, customer: User, rng: Rng, nextId
 
     const thread: MessageThread = {
       id: nextId(),
+      kind: 'booking',
       customerId: customer.id,
       ownerId: charter.ownerId,
       charterId: charter.id,
@@ -788,7 +800,9 @@ function seedDemoCustomerActivity(db: Database, customer: User, rng: Rng, nextId
     {
       id: nextId(),
       userId: customer.id,
-      kind: 'booking',
+      type: 'booking_accepted_customer',
+      category: 'booking',
+      channels: ['push', 'email'],
       title: 'Your trip is confirmed',
       body: 'Your upcoming booking has been confirmed by the owner.',
       href: '/account/bookings',
@@ -797,7 +811,9 @@ function seedDemoCustomerActivity(db: Database, customer: User, rng: Rng, nextId
     {
       id: nextId(),
       userId: customer.id,
-      kind: 'review',
+      type: 'new_review_captain',
+      category: 'review',
+      channels: ['push', 'email'],
       title: 'How was your trip?',
       body: 'Leave a review to help other guests choose the right boat.',
       href: '/account/reviews',

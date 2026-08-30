@@ -27,27 +27,37 @@ import { cx } from '@/components/ui/cx';
 export type BookingRole = 'customer' | 'owner';
 
 const STATUS_TONE: Record<BookingStatus, 'success' | 'brand' | 'neutral' | 'danger'> = {
-  confirmed: 'success',
+  request: 'brand',
   pending: 'brand',
-  completed: 'neutral',
+  confirmed: 'success',
+  accepted: 'success',
+  change_requested: 'brand',
+  change_pending: 'brand',
+  cancel_requested: 'danger',
   cancelled: 'danger',
   declined: 'danger',
-  expired: 'neutral',
+  withdrawn: 'neutral',
+  done: 'neutral',
 };
 
 const STATUS_LABEL: Record<BookingStatus, string> = {
-  confirmed: 'statusConfirmed',
+  request: 'statusRequest',
   pending: 'statusPending',
-  completed: 'statusCompleted',
+  confirmed: 'statusConfirmed',
+  accepted: 'statusAccepted',
+  change_requested: 'statusChangeRequested',
+  change_pending: 'statusChangePending',
+  cancel_requested: 'statusCancelRequested',
   cancelled: 'statusCancelled',
   declined: 'statusDeclined',
-  expired: 'statusExpired',
+  withdrawn: 'statusWithdrawn',
+  done: 'statusCompleted',
 };
 
 const TABS = [
   { key: 'upcoming', labelKey: 'upcoming' },
   { key: 'pending', labelKey: 'pending' },
-  { key: 'completed', labelKey: 'completed' },
+  { key: 'done', labelKey: 'completed' },
   { key: 'cancelled', labelKey: 'cancelled' },
   { key: 'all', labelKey: 'all' },
 ] as const;
@@ -77,10 +87,10 @@ export function BookingList({
         return booking.status === 'confirmed' && booking.date >= today;
       case 'pending':
         return booking.status === 'pending';
-      case 'completed':
-        return booking.status === 'completed';
+      case 'done':
+        return booking.status === 'done';
       case 'cancelled':
-        return ['cancelled', 'declined', 'expired'].includes(booking.status);
+        return ['cancelled', 'declined', 'withdrawn'].includes(booking.status);
       default:
         return true;
     }
@@ -331,7 +341,7 @@ function BookingRow({
           </LinkButton>
         ) : null}
 
-        {role === 'customer' && booking.status === 'completed' ? (
+        {role === 'customer' && booking.status === 'done' ? (
           <LinkButton href={`/charters/view/${booking.charterId}`} variant="ghost" size="sm">
             {t('bookings', 'rebook')}
           </LinkButton>

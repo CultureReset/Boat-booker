@@ -42,7 +42,7 @@ export async function GET(
             (b) =>
               b.charterId === charter.id &&
               b.customerId === viewer.id &&
-              (b.status === 'confirmed' || b.status === 'completed'),
+              (b.status === 'confirmed' || b.status === 'accepted' || b.status === 'done'),
           )),
     );
 

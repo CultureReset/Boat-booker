@@ -1,4 +1,5 @@
 import { commerceConfig } from '@/config/brand';
+import { defaultPolicyExtras } from '@/lib/domain/defaults';
 import { activityByKey, amenityByKey, boatTypeBySlug, durationCategoryFor } from '@/config/taxonomy';
 import { addDays, today, WEEKDAY_MASK_ALL } from '@/lib/core/dates';
 import { newId } from '@/lib/core/ids';
@@ -87,7 +88,7 @@ export function ownerDashboard(db: Database, owner: User) {
       totalListings: charters.length,
     },
     todaysTrips: bookings
-      .filter((b) => b.date === start && (b.status === 'confirmed' || b.status === 'completed'))
+      .filter((b) => b.date === start && (b.status === 'confirmed' || b.status === 'accepted' || b.status === 'done'))
       .map((b) => summariseBooking(db, b)),
     upcomingTrips: upcoming.slice(0, 6).map((b) => summariseBooking(db, b)),
     pendingRequests: pending
@@ -439,6 +440,7 @@ export function createCharter(db: Database, owner: User, input: { title: string;
       hasSecurityDeposit: false,
       securityDepositAmount: 0,
       fuelIncludedInPrice: true,
+      ...defaultPolicyExtras(commerceConfig.defaultDepositRate * 100),
       isInstantBookActive: false,
       acceptedPaymentMethods: ['visa', 'master_card', 'cash'],
       cardProcessingRate: commerceConfig.cardProcessingRate,

@@ -29,20 +29,20 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
 
   const booking = expandBooking(db, record);
   const duration = booking.package ? formatDuration(booking.package.hours) : null;
-  const confirmed = booking.status === 'confirmed' || booking.status === 'completed';
+  const confirmed = booking.status === 'confirmed' || booking.status === 'accepted' || booking.status === 'done';
 
   const statusTone =
     booking.status === 'confirmed' ? 'success'
     : booking.status === 'pending' ? 'brand'
-    : booking.status === 'completed' ? 'neutral'
+    : booking.status === 'done' ? 'neutral'
     : 'danger';
 
   const statusLabel =
     booking.status === 'confirmed' ? 'statusConfirmed'
     : booking.status === 'pending' ? 'statusPending'
-    : booking.status === 'completed' ? 'statusCompleted'
+    : booking.status === 'done' ? 'statusCompleted'
     : booking.status === 'declined' ? 'statusDeclined'
-    : booking.status === 'expired' ? 'statusExpired'
+    : booking.status === 'withdrawn' ? 'statusExpired'
     : 'statusCancelled';
 
   return (

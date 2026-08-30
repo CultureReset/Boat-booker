@@ -312,11 +312,11 @@ export function accountSummary(db: Database, user: User) {
     counts: {
       upcoming: bookings.filter((b) => b.status === 'confirmed' && b.date >= new Date().toISOString().slice(0, 10)).length,
       pending: bookings.filter((b) => b.status === 'pending').length,
-      completed: bookings.filter((b) => b.status === 'completed').length,
+      completed: bookings.filter((b) => b.status === 'done').length,
       cancelled: bookings.filter((b) => b.status === 'cancelled' || b.status === 'declined').length,
       wishlist: db.wishlist.filter((w) => w.userId === user.id).length,
       reviewsWritten: db.reviews.filter((r) => r.customerId === user.id).length,
-      awaitingReview: bookings.filter((b) => b.status === 'completed' && !b.reviewId).length,
+      awaitingReview: bookings.filter((b) => b.status === 'done' && !b.reviewId).length,
     },
   };
 }

@@ -179,7 +179,8 @@ export function sendMessage(
   const recipientId = thread.customerId === userId ? thread.ownerId : thread.customerId;
   const sender = db.users.find((u) => u.id === userId);
   notify(db, recipientId, {
-    kind: 'message',
+    type: 'im_new_message',
+    category: 'message',
     title: `New message from ${sender?.firstName ?? 'a member'}`,
     body: trimmed.slice(0, 120),
     href: thread.customerId === recipientId ? `/account/inbox/${thread.id}` : `/owner/inbox/${thread.id}`,
@@ -209,6 +210,7 @@ export function startThread(
     (() => {
       const created: MessageThread = {
         id: newId(),
+        kind: 'inquiry',
         customerId: input.customerId,
         ownerId: charter.ownerId,
         charterId: charter.id,

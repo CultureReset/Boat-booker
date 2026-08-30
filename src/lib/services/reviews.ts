@@ -33,7 +33,7 @@ export function createReview(db: Database, input: CreateReviewInput): Review {
   const booking = db.bookings.find((b) => b.id === input.bookingId);
   if (!booking) throw new ReviewError('not_found', 'Booking not found');
   if (booking.customerId !== input.customerId) throw new ReviewError('forbidden', 'Not your booking');
-  if (booking.status !== 'completed') {
+  if (booking.status !== 'done') {
     throw new ReviewError('not_completed', 'You can review a trip once it has happened');
   }
   if (booking.reviewId) throw new ReviewError('already_reviewed', 'This trip is already reviewed');
@@ -75,7 +75,8 @@ export function createReview(db: Database, input: CreateReviewInput): Review {
   booking.reviewId = review.id;
 
   notify(db, booking.ownerId, {
-    kind: 'review',
+    type: 'new_review_captain',
+    category: 'review',
     title: 'New review',
     body: `${review.rating.toFixed(1)}★ — “${review.headline}”`,
     href: `/owner/reviews`,
@@ -101,7 +102,8 @@ export function respondToReview(
   review.ownerRespondedAt = new Date().toISOString();
 
   notify(db, review.customerId, {
-    kind: 'review',
+    type: 'review_reply_added_customer',
+    category: 'review',
     title: 'The owner replied to your review',
     body: trimmed.slice(0, 120),
     href: `/account/reviews`,

@@ -37,12 +37,21 @@ async function main(): Promise<void> {
       ['bookings', db.bookings.length],
       ['  confirmed', db.bookings.filter((b) => b.status === 'confirmed').length],
       ['  pending', db.bookings.filter((b) => b.status === 'pending').length],
-      ['  completed', db.bookings.filter((b) => b.status === 'completed').length],
+      ['  done', db.bookings.filter((b) => b.status === 'done').length],
       ['reviews', db.reviews.length],
       ['threads', db.threads.length],
       ['messages', db.messages.length],
       ['payouts', db.payouts.length],
       ['availability blocks', db.availability.length],
+      ['offers', db.offers.length],
+      ['add-ons', db.addOns.length],
+      ['itineraries', db.itineraries.length],
+      ['  published', db.itineraries.filter((i) => i.status === 'published').length],
+      ['quick replies', db.quickReplies.length],
+      ['account health', db.accountHealth.length],
+      ['direct settings', db.directSettings.length],
+      ['  enabled', db.directSettings.filter((d) => d.enabled).length],
+      ['catches', db.catches.length],
     ];
 
     console.log('');

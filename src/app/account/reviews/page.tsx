@@ -19,7 +19,7 @@ export default async function ReviewsPage() {
 
   // Completed trips with no review yet — the prompt at the top of the page.
   const awaiting: AwaitingReview[] = db.bookings
-    .filter((b) => b.customerId === user.id && b.status === 'completed' && !b.reviewId)
+    .filter((b) => b.customerId === user.id && b.status === 'done' && !b.reviewId)
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((booking) => {
       const charter = db.charters.find((c) => c.id === booking.charterId);

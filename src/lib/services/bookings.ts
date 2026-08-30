@@ -2,10 +2,13 @@ import { commerceConfig } from '@/config/brand';
 import { addDays, daysBetween, isPast, today } from '@/lib/core/dates';
 import { newBookingReference, newId } from '@/lib/core/ids';
 import { roundMoney } from '@/lib/core/money';
+import { bookingExtras } from '@/lib/domain/defaults';
 import type {
   Booking,
   BookingStatus,
+  CancellationReasonKey,
   Database,
+  NotificationCategory,
   PaymentMode,
   PriceBreakdown,
 } from '@/lib/domain/types';
@@ -17,10 +20,13 @@ import { computeBreakdown, loyaltyTierFor, refundFor } from './pricing';
  *
  * Statuses move in one direction only:
  *
- *   pending ──accept──▶ confirmed ──trip date passes──▶ completed
+ *   pending ──accept──▶ confirmed/accepted ──trip date passes──▶ done
  *      │                    │
  *      ├──decline──▶ declined   └──cancel──▶ cancelled
- *      └──window elapses──▶ expired
+ *      └──window elapses──▶ withdrawn
+ *
+ * `done` rather than "completed", and a lapsed request becomes `withdrawn`,
+ * both to match the vocabulary the platform shows its own users.
  *
  * Every transition that frees a date releases the calendar block, and every
  * transition that takes one reserves it, so the calendar can never drift from
@@ -182,6 +188,7 @@ export function createBooking(db: Database, input: CreateBookingInput): Booking 
   const nowIso = new Date().toISOString();
 
   const booking: Booking = {
+    ...bookingExtras(priced.breakdown.dueOnArrival, priced.breakdown.currency),
     id: newId(),
     reference: newBookingReference(),
     charterId: charter.id,
@@ -234,6 +241,7 @@ export function createBooking(db: Database, input: CreateBookingInput): Booking 
     ownerId: charter.ownerId,
     charterId: charter.id,
     bookingId: booking.id,
+    kind: 'booking' as const,
     subject: charter.title,
     createdAt: nowIso,
     updatedAt: nowIso,
@@ -251,7 +259,8 @@ export function createBooking(db: Database, input: CreateBookingInput): Booking 
   }
 
   notify(db, charter.ownerId, {
-    kind: 'booking',
+    type: 'booking_new',
+    category: 'booking',
     title: instant ? 'New booking confirmed' : 'New booking request',
     body: `${input.contact.firstName} ${input.contact.lastName} · ${booking.date} · ${guests} guests`,
     href: `/owner/bookings/${booking.id}`,
@@ -272,7 +281,8 @@ export function acceptBooking(db: Database, bookingId: string, ownerId: string):
   schedulePayout(db, booking);
 
   notify(db, booking.customerId, {
-    kind: 'booking',
+    type: 'booking_accepted_customer',
+    category: 'booking',
     title: 'Your trip is confirmed',
     body: `Booking ${booking.reference} on ${booking.date} is confirmed.`,
     href: `/account/bookings/${booking.id}`,
@@ -295,12 +305,13 @@ export function declineBooking(
 
   booking.status = 'declined';
   booking.cancelledAt = new Date().toISOString();
-  booking.cancellationReason = reason;
+  booking.cancellationReason = reason as CancellationReasonKey | undefined;
   releaseDates(db, booking.id);
   refundCredit(db, booking);
 
   notify(db, booking.customerId, {
-    kind: 'booking',
+    type: 'booking_declined_customer',
+    category: 'booking',
     title: 'Booking request declined',
     body: reason
       ? `${booking.reference} was declined: ${reason}`
@@ -345,7 +356,7 @@ export function cancelBooking(
 
   booking.status = 'cancelled';
   booking.cancelledAt = new Date().toISOString();
-  booking.cancellationReason = reason;
+  booking.cancellationReason = reason as CancellationReasonKey | undefined;
   booking.refundAmount = outcome.refund;
 
   releaseDates(db, booking.id);
@@ -355,7 +366,8 @@ export function cancelBooking(
   db.payouts = db.payouts.filter((p) => !(p.bookingId === booking.id && p.status === 'pending'));
 
   notify(db, isCustomer ? booking.ownerId : booking.customerId, {
-    kind: 'booking',
+    type: 'booking_canceled_by_customer_captain',
+    category: 'booking',
     title: 'Booking cancelled',
     body: `${booking.reference} on ${booking.date} was cancelled.`,
     href: isCustomer ? `/owner/bookings/${booking.id}` : `/account/bookings/${booking.id}`,
@@ -375,7 +387,7 @@ export function settleElapsedBookings(db: Database): number {
 
   for (const booking of db.bookings) {
     if (booking.status === 'confirmed' && booking.date < cutoff) {
-      booking.status = 'completed';
+      booking.status = 'done';
       changed += 1;
 
       const customer = db.users.find((u) => u.id === booking.customerId);
@@ -390,7 +402,7 @@ export function settleElapsedBookings(db: Database): number {
 
     // A request the owner never answered releases its hold.
     if (booking.status === 'pending' && booking.respondByAt && booking.respondByAt < now) {
-      booking.status = 'expired';
+      booking.status = 'withdrawn';
       releaseDates(db, booking.id);
       refundCredit(db, booking);
       changed += 1;
@@ -439,12 +451,20 @@ function requireBooking(db: Database, bookingId: string): Booking {
 export function notify(
   db: Database,
   userId: string,
-  input: { kind: 'booking' | 'message' | 'review' | 'payout' | 'system'; title: string; body: string; href?: string },
+  input: {
+    type: string;
+    category: NotificationCategory;
+    title: string;
+    body: string;
+    href?: string;
+  },
 ): void {
   db.notifications.push({
     id: newId(),
     userId,
-    kind: input.kind,
+    type: input.type,
+    category: input.category,
+    channels: ['push', 'email'],
     title: input.title,
     body: input.body,
     href: input.href,
@@ -491,7 +511,7 @@ export function expandBooking(db: Database, booking: Booking) {
           displayName: owner.ownerProfile?.captainName ?? `${owner.firstName} ${owner.lastName}`,
           companyName: owner.ownerProfile?.companyName ?? '',
           // Contact details are released only once a trip is actually on.
-          phone: booking.status === 'confirmed' || booking.status === 'completed' ? owner.phone : undefined,
+          phone: booking.status === 'confirmed' || booking.status === 'accepted' || booking.status === 'done' ? owner.phone : undefined,
         }
       : null,
     customer: customer
@@ -508,7 +528,7 @@ export function expandBooking(db: Database, booking: Booking) {
     canCancel: booking.status === 'pending' || booking.status === 'confirmed',
     freeCancellationUntil: freeDays > 0 ? addDays(booking.date, -freeDays) : null,
     isFreeCancellation: freeDays > 0 && daysUntil >= freeDays,
-    canReview: booking.status === 'completed' && !booking.reviewId,
+    canReview: booking.status === 'done' && !booking.reviewId,
   };
 }
 

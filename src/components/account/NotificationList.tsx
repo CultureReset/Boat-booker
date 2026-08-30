@@ -18,11 +18,15 @@ import { cx } from '@/components/ui/cx';
  * so this only has to render and mark them read.
  */
 
-const KIND_ICON: Record<Notification['kind'], IconName> = {
+const KIND_ICON: Record<Notification['category'], IconName> = {
   booking: 'tag',
   message: 'message',
   review: 'star-empty',
   payout: 'wallet',
+  onboarding: 'check',
+  product_update: 'bolt',
+  ticket: 'info',
+  marketing: 'heart',
   system: 'info',
 };
 
@@ -78,7 +82,7 @@ export function NotificationList({ notifications: initial }: { notifications: No
                   notification.readAt ? 'bg-surface-sunken text-ink-muted' : 'bg-brand-50 text-brand-700',
                 )}
               >
-                <Icon name={KIND_ICON[notification.kind]} size={17} />
+                <Icon name={KIND_ICON[notification.category]} size={17} />
               </span>
               <span className="min-w-0 flex-1">
                 <span

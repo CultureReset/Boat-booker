@@ -35,7 +35,7 @@ export default async function OwnerBookingPage({ params }: { params: Promise<{ i
   const statusTone =
     booking.status === 'confirmed' ? 'success'
     : booking.status === 'pending' ? 'warning'
-    : booking.status === 'completed' ? 'neutral'
+    : booking.status === 'done' ? 'neutral'
     : 'danger';
 
   return (
