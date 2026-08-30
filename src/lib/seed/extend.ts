@@ -67,10 +67,25 @@ const CATCH_CAPTIONS = [
   'Captain put us right on top of them. Home by two with plenty to show for it.',
 ];
 
+/**
+ * The demo operator's own listings.
+ *
+ * A coin flip is right for the other 144 listings — a demo where every boat
+ * has everything shows nothing about how the product behaves when they do not.
+ * But the demo account is what a person actually opens, and an empty Add-ons
+ * screen there reads as an unbuilt feature rather than an unused one.
+ */
+function demoOwnerCharters(db: Database): Set<string> {
+  const owner = db.users.find((u) => u.email === 'owner@boatbooker.demo');
+  return new Set(db.charters.filter((c) => c.ownerId === owner?.id).map((c) => c.id));
+}
+
 /** Trips need somewhere to sell extras, and add-ons need a listing to sit on. */
 function seedAddOns(db: Database, rng: Rng, nextId: () => string): void {
+  const demo = demoOwnerCharters(db);
+
   for (const charter of db.charters) {
-    if (!rng.bool(0.55)) continue;
+    if (!demo.has(charter.id) && !rng.bool(0.55)) continue;
     for (const template of rng.sample(ADD_ON_TEMPLATES, rng.int(1, 3))) {
       db.addOns.push({
         id: nextId(),
@@ -95,11 +110,15 @@ function seedAddOns(db: Database, rng: Rng, nextId: () => string): void {
  */
 function seedItineraries(db: Database, rng: Rng, nextId: () => string): void {
   const now = new Date().toISOString();
+  const demo = demoOwnerCharters(db);
 
   for (const pkg of db.packages) {
-    if (!rng.bool(0.34)) continue;
+    const isDemo = demo.has(pkg.charterId);
+    if (!isDemo && !rng.bool(0.34)) continue;
 
-    const publish = rng.bool(0.6);
+    // The demo listing gets one of each, so both the published view and the
+    // publish gate are reachable without hunting for a listing that has them.
+    const publish = isDemo ? rng.bool(0.5) : rng.bool(0.6);
     const stepCount = publish
       ? rng.int(ITINERARY_MIN_STEPS_PER_DAY + 1, ITINERARY_MIN_STEPS_PER_DAY + 3)
       : 1;
