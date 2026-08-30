@@ -1,4 +1,5 @@
 import { newId } from '@/lib/core/ids';
+import { notificationType } from './notificationCatalogue';
 import type {
   Database,
   Notification,
@@ -64,9 +65,18 @@ const CATEGORY_CHANNELS: Record<NotificationCategory, NotificationChannel[]> = {
   system: ['push', 'email'],
 };
 
-function channelsFor(user: User | undefined, category: NotificationCategory): NotificationChannel[] {
-  const allowed = CATEGORY_CHANNELS[category] ?? ['push'];
+function channelsFor(
+  user: User | undefined,
+  category: NotificationCategory,
+  typeKey: string,
+): NotificationChannel[] {
+  const type = notificationType(typeKey);
+  const allowed = type?.channels ?? CATEGORY_CHANNELS[category] ?? ['push'];
   if (!user) return allowed;
+
+  // Anything the recipient must act on ignores preferences: a booking request
+  // an operator never sees costs them the trip and their response rate.
+  if (type && !type.optOut) return allowed;
 
   const gates = CATEGORY_PREFERENCE[category];
   if (!gates) return allowed;
@@ -88,7 +98,7 @@ export function notify(db: Database, userId: string, input: NotifyInput): Notifi
     userId,
     type: input.type,
     category: input.category,
-    channels: channelsFor(user, input.category),
+    channels: channelsFor(user, input.category, input.type),
     title: input.title,
     body: input.body,
     href: input.href,
