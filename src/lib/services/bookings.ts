@@ -3,8 +3,10 @@ import { addDays, daysBetween, isPast, today } from '@/lib/core/dates';
 import { newBookingReference, newId } from '@/lib/core/ids';
 import { roundMoney } from '@/lib/core/money';
 import { bookingExtras } from '@/lib/domain/defaults';
+import { LIVE_BOOKING_STATUSES } from '@/lib/domain/types';
 import type {
   AddOn,
+  AppliedPenalty,
   Booking,
   BookingAddOn,
   BookingSource,
@@ -13,9 +15,12 @@ import type {
   Database,
   NotificationCategory,
   PaymentMode,
+  PenaltyImpact,
   PriceBreakdown,
 } from '@/lib/domain/types';
 import { buildBlockIndex, packageAvailability, releaseDates, reserveDates } from './availability';
+import { applyPenalties, assessCancellation } from './cancellation';
+import { activeChangeFor } from './changes';
 import { notify } from './notifications';
 import { assertOfferBookable, markOfferAccepted } from './offers';
 import { computeBreakdown, loyaltyTierFor, refundFor } from './pricing';
@@ -388,14 +393,50 @@ export interface CancellationOutcome {
   refund: number;
   forfeited: number;
   free: boolean;
+  /** What this cancellation cost the operator, empty when penalty-free. */
+  penalties: AppliedPenalty[];
+  impact: PenaltyImpact;
+  pendingSupportReview: boolean;
 }
 
-/** Cancel as the customer. Refund follows the listing's cancellation policy. */
+/**
+ * Preview a cancellation without performing it.
+ *
+ * The confirmation screen shows the operator exactly what cancelling will do
+ * before they commit, which only works if assessment and mutation are separate
+ * calls.
+ */
+export function previewCancellation(
+  db: Database,
+  bookingId: string,
+  actorId: string,
+  reason: CancellationReasonKey,
+): { refund: number; forfeited: number; free: boolean; assessment: ReturnType<typeof assessCancellation> } {
+  const booking = requireBooking(db, bookingId);
+  const isOwner = booking.ownerId === actorId;
+  const isCustomer = booking.customerId === actorId;
+  if (!isCustomer && !isOwner) throw new BookingError('forbidden', 'Not your booking');
+
+  const charter = db.charters.find((c) => c.id === booking.charterId);
+  const daysUntil = daysBetween(today(), booking.date);
+
+  const outcome = isOwner
+    ? { refund: booking.breakdown.dueNow, forfeited: 0, free: true }
+    : refundFor(booking.breakdown, charter?.policies.freeCancellationDaysInAdvance ?? 0, daysUntil);
+
+  return {
+    ...outcome,
+    assessment: assessCancellation(db, booking, reason, isOwner ? 'owner' : 'customer'),
+  };
+}
+
+/** Cancel as either party. Refund follows the listing's cancellation policy. */
 export function cancelBooking(
   db: Database,
   bookingId: string,
   actorId: string,
-  reason?: string,
+  reason?: CancellationReasonKey,
+  note?: string,
 ): CancellationOutcome {
   const booking = requireBooking(db, bookingId);
 
@@ -403,7 +444,7 @@ export function cancelBooking(
   const isOwner = booking.ownerId === actorId;
   if (!isCustomer && !isOwner) throw new BookingError('forbidden', 'Not your booking');
 
-  if (booking.status !== 'pending' && booking.status !== 'confirmed') {
+  if (!LIVE_BOOKING_STATUSES.includes(booking.status)) {
     throw new BookingError('invalid_transition', 'This booking can no longer be cancelled');
   }
 
@@ -415,12 +456,31 @@ export function cancelBooking(
     ? { refund: booking.breakdown.dueNow, forfeited: 0, free: true }
     : refundFor(booking.breakdown, charter?.policies.freeCancellationDaysInAdvance ?? 0, daysUntil);
 
+  const reasonKey: CancellationReasonKey = reason ?? 'other';
+  const assessment = assessCancellation(db, booking, reasonKey, isOwner ? 'owner' : 'customer');
+
   booking.status = 'cancelled';
   booking.cancelledAt = new Date().toISOString();
-  booking.cancellationReason = reason as CancellationReasonKey | undefined;
+  booking.cancellationReason = reasonKey;
   booking.refundAmount = outcome.refund;
+  booking.cancellation = {
+    reason: reasonKey,
+    initiatedBy: isOwner ? 'owner' : 'customer',
+    note: note?.trim().slice(0, 2000),
+    cancelledAt: booking.cancelledAt,
+    refundAmount: outcome.refund,
+    forfeitedAmount: outcome.forfeited,
+    penalties: assessment.penalties,
+    pendingSupportReview: assessment.supportReview,
+  };
 
-  releaseDates(db, booking.id);
+  // A weather cancellation keeps the slot blocked — the weather has not
+  // improved for the next guest either — so the date is only freed when the
+  // assessment says to open it.
+  const opensCalendar = assessment.penalties.some((p) => p.key === 'calendar_opened');
+  if (opensCalendar || isCustomer) releaseDates(db, booking.id);
+
+  applyPenalties(db, booking, assessment, reasonKey);
   refundCredit(db, booking);
 
   // Any payout scheduled against this booking is withdrawn.
@@ -434,7 +494,13 @@ export function cancelBooking(
     href: isCustomer ? `/owner/bookings/${booking.id}` : `/account/bookings/${booking.id}`,
   });
 
-  return { booking, ...outcome };
+  return {
+    booking,
+    ...outcome,
+    penalties: assessment.penalties,
+    impact: assessment.impact,
+    pendingSupportReview: assessment.supportReview,
+  };
 }
 
 /**
@@ -563,7 +629,12 @@ export function expandBooking(db: Database, booking: Booking) {
     threadId: thread?.id,
     review: review ? { id: review.id, rating: review.rating, headline: review.headline } : null,
     daysUntilTrip: daysUntil,
-    canCancel: booking.status === 'pending' || booking.status === 'confirmed',
+    changeRequest: activeChangeFor(db, booking.id) ?? null,
+    canCancel: LIVE_BOOKING_STATUSES.includes(booking.status),
+    // A change needs a settled booking to change *from*, so a request already
+    // in flight blocks a second one.
+    canRequestChange:
+      (booking.status === 'confirmed' || booking.status === 'accepted') && !booking.changeRequestId,
     freeCancellationUntil: freeDays > 0 ? addDays(booking.date, -freeDays) : null,
     isFreeCancellation: freeDays > 0 && daysUntil >= freeDays,
     canReview: booking.status === 'done' && !booking.reviewId,

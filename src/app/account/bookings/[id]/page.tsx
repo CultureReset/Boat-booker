@@ -10,6 +10,7 @@ import { expandBooking } from '@/lib/services/bookings';
 import { Icon } from '@/components/ui/Icon';
 import { Badge, Divider, LinkButton, PhotoFrame } from '@/components/ui/primitives';
 import { BookingActions } from '@/components/account/BookingActions';
+import { ChangeRequestPanel } from '@/components/booking/ChangeBookingFlow';
 
 export const metadata: Metadata = { title: t('bookings', 'viewDetails') };
 
@@ -224,12 +225,28 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
             {t('bookings', 'leaveReview')}
           </LinkButton>
         ) : null}
+        {booking.changeRequest ? (
+          <ChangeRequestPanel
+            bookingId={booking.id}
+            role="customer"
+            currency={booking.currency}
+            request={{
+              id: booking.changeRequest.id,
+              requestedBy: booking.changeRequest.requestedBy,
+              note: booking.changeRequest.note,
+              priceDifference: booking.changeRequest.priceDifference,
+              expiresAt: booking.changeRequest.expiresAt,
+              original: booking.changeRequest.original,
+              requested: booking.changeRequest.requested,
+            }}
+          />
+        ) : null}
+
         <BookingActions
           bookingId={booking.id}
+          role="customer"
           canCancel={booking.canCancel}
-          isFree={booking.isFreeCancellation}
-          refundAmount={formatMoney(booking.isFreeCancellation ? booking.breakdown.dueNow : 0, booking.currency)}
-          forfeitAmount={formatMoney(booking.breakdown.dueNow, booking.currency)}
+          canRequestChange={booking.canRequestChange}
         />
       </div>
     </div>

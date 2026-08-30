@@ -816,6 +816,95 @@ export const catalog = {
     useThisReply: 'Use this reply',
   },
 
+  changeBooking: {
+    pageTitle: 'Change booking',
+    step1Heading: 'What do you want to change?',
+    step2Heading: 'Let them know why you need to change the booking',
+    step3Heading: 'Does this look right?',
+    step2Info: 'Your message will be delivered to their inbox.',
+    step2Paragraph:
+      'A personal note helps the other party understand why the booking needs to change.',
+    step3Info: 'They will have %hours% hours to respond.',
+    step3InfoPriceChanged:
+      'This change adjusts the price, so our support team will confirm it within 24 hours.',
+    noteLabel: 'Message',
+    notePlaceholder: 'Write your message…',
+    labelTripDate: 'Trip date',
+    labelDepartureTime: 'Departure time',
+    labelGroupSize: 'Group size',
+    labelDays: 'Number of days',
+    labelTrip: 'Trip package',
+    originalLabel: 'Original',
+    requestedLabel: 'Requested',
+    priceDifference: 'Trip price difference',
+    noPriceAdjustment: 'No adjustment to the trip price',
+    sharedTripLocked:
+      'This is a shared trip with other people on board, so the group size cannot change.',
+    reviewAndSend: 'Review and send request',
+    sendRequest: 'Send request',
+    requestSentHeading: 'Your request has been sent',
+    requestSentParagraph:
+      'If they accept, the booking updates automatically. If they decline, it stays as it is.',
+    requestSentPriceChanged: 'Your request has been sent to our support team',
+    requestSentPriceParagraph:
+      'Because the price changes, our team will review this and get back to you within 24 hours.',
+    backToBooking: 'Return to booking details',
+
+    // Responding
+    respondHeading: 'Change requested',
+    respondBodyCustomer: 'Your captain wants to change this booking.',
+    respondBodyOwner: 'The customer asked to change this booking.',
+    remainingTime: 'You have %time% to respond.',
+    accept: 'Accept requested changes',
+    decline: 'Decline requested changes',
+    declineExplained: 'If you decline, the booking stays unchanged.',
+    acceptWithPriceChange:
+      'Because this change adjusts the price, we update it manually. Once you accept we will get back to you within 24 hours.',
+    acceptWithoutPriceChange:
+      'Once you accept, the change applies immediately and the other party is notified.',
+    withdraw: 'Withdraw request',
+    withdrawConfirm: 'Withdraw your request? The booking stays unchanged.',
+    withdrawn: 'Request withdrawn',
+    accepted: 'Change accepted',
+    declined: 'Change declined',
+    expired: 'Change request expired',
+  },
+
+  cancel: {
+    pageTitle: 'Cancel booking',
+    reasonHeadingCustomer: 'Why are you cancelling your trip?',
+    reasonHeadingOwner: 'Why are you cancelling this trip?',
+    selectReason: 'Select a reason',
+    noteLabel: 'Anything else we should know?',
+    notePlaceholder: 'Add any details that help us process this…',
+    whatHappensNext: 'What happens next',
+    showDetails: 'Show details',
+    hideDetails: 'Hide details',
+    refundTitle: 'Refund',
+    refundFull: 'You get a full refund for this booking.',
+    refundPartial: 'You will get a partial refund.',
+    refundNone:
+      'This cancellation does not qualify for a refund because it breaches the cancellation policy.',
+    refundReview:
+      'Our team will review this cancellation to decide whether you are eligible for a refund.',
+    penaltyFreeTitle: 'Your listing has not been affected',
+    penaltyFreeBody:
+      'Cancellations caused by unsafe weather or circumstances outside your control do not affect your listing.',
+    penaltiesIntro:
+      'These cancellations are disappointing for customers who could have booked with a more suitable operator. Keeping your listing and calendar up to date stops this happening again.',
+    penaltiesAfter:
+      'Customers rely on accurate availability, so please keep your information current.',
+    suspensionLimit: 'Booking limit reached (%current%/%limit%) — see details.',
+    suspensionPaused: 'Your listing has been paused — see details.',
+    confirmCancel: 'Confirm cancellation',
+    keepBooking: 'Keep this booking',
+    cancelling: 'Cancelling…',
+    cancelledTitle: 'Booking cancelled',
+    cancelledBody: 'The other party has been notified.',
+    considerChanging: 'Would a booking change work instead of cancelling?',
+    changeInstead: 'Change the booking instead',
+  },
+
   offers: {
     pageTitle: 'Create an offer',
     subtitle: 'Invite %name% to book by sending a custom offer',

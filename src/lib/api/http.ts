@@ -3,6 +3,7 @@ import { currentUser } from '@/lib/auth/session';
 import { getDb, mutate } from '@/lib/storage';
 import type { Database, User } from '@/lib/domain/types';
 import { settleElapsedBookings } from '@/lib/services/bookings';
+import { settleElapsedChanges } from '@/lib/services/changes';
 import { settleElapsedOffers } from '@/lib/services/offers';
 
 /**
@@ -113,7 +114,12 @@ export async function settle(): Promise<void> {
     db.changeRequests.some((c) => c.status === 'requested' && c.expiresAt <= nowIso);
 
   if (bookingsDue) await mutate((next) => settleElapsedBookings(next));
-  if (offersDue) await mutate((next) => settleElapsedOffers(next));
+  if (offersDue) {
+    await mutate((next) => {
+      settleElapsedOffers(next);
+      settleElapsedChanges(next);
+    });
+  }
 }
 
 export type AuthedHandler<T> = (user: User, db: Database) => T | Promise<T>;
